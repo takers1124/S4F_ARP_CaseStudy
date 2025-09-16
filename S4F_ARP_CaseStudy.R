@@ -11,6 +11,12 @@
 
 # (1) setup ----
 
+## download data ----
+# 
+# https://drive.google.com/file/d/141dBLlpljfMMbwoj5rT_CJ8ySGYQn21Q/view?usp=sharing
+
+## load libraries ----
+
 # first go to your output pane (bottom right) -> packages -> install
 # type the name of each to search, then install, then run the library for each (below)
 # libraries will need to be run with each new session, but package downloaded only once 
