@@ -1,11 +1,31 @@
 # for the instructor
 
-# road ----
-road_rast4 <- rast("road_rast4(Geom).tif")
-plot(road_rast4)
+# (1) ----
+# have students:
+  # start a new R project, name it S4F_ARP_CaseStudy
+  # download the S4F_ARP_CaseStudy.R script from GH
+  # download input_data.zip from drive
+    # unzip and move input_data folder into R project folder
+# mention:
+  # outline utility
+  # syntax for coding / online resources 
 
 
-# EVH ----
+# (2) ----
+# mention:
+  # when coding, you must tell the computer exactly where to look for any file you are working with
+    # we call this the "working directory"
+  # use of %>% to string functions together in a sequence
+
+# (3) ----
+## road ----
+# pull up road(2)_raster_resized_img to show
+  # explain that the pixel rendering is not fantastic in R - tradeoffs
+    # and why I use Arc in combo to make final maps after doing data analysis in R
+
+## EVH ----
+# if have time, could show them the original data and pre-processing steps:
+
 EVH_CO <- rast("EVH_CO.tif") # in EPSG: 5070
 
 ### crop / mask ----
@@ -75,6 +95,28 @@ EVH_classified3 <- classify(EVH_classified2, rcl_matrix, others = NULL)
 
 #### plot ----
 plot(EVH_classified3, col = green_palette)
+
+# from here, see student's code, and replace ARP_height_rast with ^
+
+#### feedback ----
+# Does a 20 ft threshold make sense?
+# Does it make sense to make all >20 ft cells equal (not a continuous score)?
+
+# (4) ----
+
+# mention:
+  # how exploring the data is important 
+  # can check frequency of cell values in the raster to see distribution
+  # can also make frequency distribution graphs 
+
+# (5) ----
+
+#### feedback ----
+# this filtering process is very subjective
+# somehow we need to narrow down our search areas
+# any alternative ideas for doing so?
+
+
 
 
 
