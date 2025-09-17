@@ -270,6 +270,9 @@ ARP_PCU_102_rast <- combined_rast %>%
 
 # inspect
 plot(ARP_PCU_102_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
 freq(ARP_PCU_102_rast)
   # value  count
   # 102 685213
@@ -281,6 +284,9 @@ ARP_PCU_103_rast <- combined_rast %>%
 
 # inspect
 plot(ARP_PCU_103_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
 freq(ARP_PCU_103_rast)
 # value  count
 # 103 199972
