@@ -12,8 +12,9 @@
 # (1) setup ----
 
 ## download data ----
-# 
+# go to this google drive folder, and download the .zip file
 # https://drive.google.com/file/d/141dBLlpljfMMbwoj5rT_CJ8ySGYQn21Q/view?usp=sharing
+# unzip the file, and move the input_data folder into your r project folder 
 
 ## load libraries ----
 
@@ -36,6 +37,10 @@ library(ggplot2) # for fancy plotting
 # then learn how to filter the data for just the ARP polygon and it's associated attributes 
 
 ## ARP ----
+# navigate to the "input_data" folder that you downloaded in step 1
+# > shp_files 
+# click "more" > "set as working directory"
+
 ### read file ----
 NF_CO_vect <- vect("NF_CO_vect.shp")
 
@@ -114,6 +119,7 @@ CO_road_rast <- rast("CO_road_rast.tif")
 plot(CO_road_rast)
 
 ### crop & mask ----
+# here we use the ARP_vect polygon to crop (and mask) only the area we want from the raster
 ARP_road_rast <- crop(CO_road_rast, ARP_vect, mask=TRUE)
 plot(ARP_road_rast)
 
@@ -138,7 +144,8 @@ road_sequence = c(c(seq(0, 1463.036, 146.3036),1609.34), c(seq(146.3036, 1609.34
 # from 1609.34 to 37416.17 becomes NA, while the other lower values become 0-1
 
 # create matrix
-road_matrix = matrix(road_sequence, ncol=3, byrow=FALSE) 
+road_matrix = matrix(road_sequence, ncol=3, byrow=FALSE)
+# viz matrix
 
 # classify
 ARP_road_class_rast = classify(ARP_road_dist_rast, road_matrix, right=NA, others=NA)
@@ -147,7 +154,7 @@ plot(ARP_road_class_rast)
 ### inverse score ---- 
 ARP_road_inv_rast <- (1 - ARP_road_class_rast)
 plot(ARP_road_inv_rast)
-plot(is.na(ARP_road_inv))
+plot(is.na(ARP_road_inv_rast)) # just a visual check
 
 ### crop & mask ----
 # do again because distance made a buffer that goes beyond ARP
@@ -155,7 +162,7 @@ ARP_road_score_rast <- crop(ARP_road_inv_rast, ARP_vect, mask=TRUE)
 
 ### viz ----
 plot(ARP_road_score_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
@@ -166,10 +173,10 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 ## (3.d) tree height ----
 # using existing vegetation height (EVH) from LANDFIRE
 # prior processing:
-  # filter for only trees 
-  # convert heigh units from m to ft
+  # filter for only trees (the data set also has shrubs and herbs)
+  # convert height units from m to ft
   # filter only trees >= 20 ft
-# cell values = height in meters
+# cell values = height in ft
 
 ### read ----
 ARP_height_rast <- rast("ARP_height_rast.tif")
@@ -193,6 +200,8 @@ minmax(ARP_height_rast)
 # set sequence
 # from, to, becomes
 height_sequence = c(22.96588,82.02100,100)
+# we want to be able to distinguish the height priority from the others
+  # so we make it 100! 
 
 # create matrix 
 height_matrix = matrix(height_sequence, ncol=3, byrow=TRUE)
@@ -206,20 +215,26 @@ unique(ARP_height_score_rast) # 100
 ### viz ----
 # see classified values
 plot(ARP_height_score_rast, col = "darkgreen")
-polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 # writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
 # ARP_height_score_rast <- rast("ARP_height_score_rast")
 
+#### feedback ----
+# Does a 20 ft threshold make sense?
+# Does it make sense to make all >20 ft cells equal (not a continuous score)?
+
 
 # (4) combine data ----
+
 # now we will do some raster math
   # sum the cell values among the 4 data layers
   # if a cell for any layer = NA, then NA is returned
 
-combined_rast <- sum(ARP_risk_score_rast, ARP_slope_score_rast, ARP_road_score_rast, ARP_height_score_rast, na.rm=FALSE)
+combined_rast <- sum(ARP_risk_score_rast, ARP_slope_score_rast, ARP_road_score_rast, ARP_height_score_rast, na.rm=FALSE) %>% 
+  rename(score = FLEP8_CO)
 
 ### viz ----
 plot(combined_rast)
@@ -242,7 +257,57 @@ freq(combined_rast)
 3761818*900 # = 3385636200 square meters
 3385636200/4046.86 # 4046.86 m/acre = 836,608.2 acres
 
-# (5) filter areas for PCUs ----
+
+# (5) make PCUs ----
+
+# we need feasible (small) units to send the scouting crew - you guys!
+  # so we will filter the data and make "patches" of high-scoring areas
+    # we call these Potential Collection Units (PCUs)
+
+## filter 102 ----
+ARP_PCU_102_rast <- combined_rast %>% 
+  filter(score >= 102)
+
+# inspect
+plot(ARP_PCU_102_rast)
+freq(ARP_PCU_102_rast)
+  # value  count
+  # 102 685213
+  # 103 199972
+
+## filter 103 ----
+ARP_PCU_103_rast <- combined_rast %>% 
+  filter(score >= 102.5)
+
+# inspect
+plot(ARP_PCU_103_rast)
+freq(ARP_PCU_103_rast)
+# value  count
+# 103 199972
+
+#### feedback ----
+# this filtering process is very subjective
+# somehow we need to narrow down our search areas
+# any alternative ideas for doing so?
+
+## patches ----
+# in this step, we convert dense raster cells (with values) into "patches"
+
+## polygons ----
+# in this step, we convert the above "patches" into polygons for ease of map making & calculating stats
+
+## attributes ----
+# in this step, we add attributes (metadata) to our polygons
+  # this is how we further filter & select PCUs for scouting
+# ex attributes:
+  # mean tree height, slope, road distance, score
+  # biomass for target species (species distribution)
+  # insect disease history maps, etc
+
+
+# (6) make maps ----
+# here we would use ggplot2 to make fancy maps and/or export to Arc
+
 
 
 
