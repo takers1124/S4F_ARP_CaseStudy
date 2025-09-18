@@ -167,7 +167,7 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 # writeRaster(ARP_road_score_rast, "ARP_road_score_rast.tif")
-# ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
+ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
 
 
 ## (3.d) tree height ----
@@ -220,7 +220,7 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 # writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
-# ARP_height_score_rast <- rast("ARP_height_score_rast")
+ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
 
 #### feedback ----
 # Does a 20 ft threshold make sense?
@@ -257,6 +257,9 @@ freq(combined_rast)
 3761818*900 # = 3385636200 square meters
 3385636200/4046.86 # 4046.86 m/acre = 836,608.2 acres
 
+### write & read ----
+writeRaster(combined_rast, "combined_rast.tif")
+combined_rast <- rast("combined_rast.tif")
 
 # (5) make PCUs ----
 
@@ -291,16 +294,63 @@ freq(ARP_PCU_103_rast)
 # value  count
 # 103 199972
 
+### write & read ----
+# writeRaster(ARP_PCU_103_rast, "ARP_PCU_103_rast.tif")
+# ARP_PCU_103_rast <- rast("ARP_PCU_103_rast.tif")
+
 #### feedback ----
 # this filtering process is very subjective
 # somehow we need to narrow down our search areas
 # any alternative ideas for doing so?
 
+
+
 ## patches ----
 # in this step, we convert dense raster cells (with values) into "patches"
+ARP_PCU_patches <- patches(ARP_PCU_103_rast, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
+
+plot(ARP_PCU_patches)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+# looks pretty much the same, just the values are different
+
+### explore ----
+# there are 47191  patches 
+patch_sizes <- freq(ARP_PCU_patches)
+patches_box <- boxplot(ARP_PCU_patches) # lots of low values
+
+## remove small patches ----
+# 225 cells ~ 50 acres
+small_patches <- patch_sizes %>% filter(count <= 225) %>% select(value) # 47131 rows (patches)
+# so, the vast majority of patches are small 
+47191-47131 # = 60 patches > 50 acres
+
+### classify ----
+ARP_PCU_patches_classified <- classify(ARP_PCU_patches, rcl = cbind(small_patches, NA))
+
+### explore ----
+ARP_PCU_patches_freq <- freq(ARP_PCU_patches_classified) # confirmed, 60 patches
+ARP_PCU_cells <- sum(ARP_PCU_patches_freq$count) # 39,565 cells
+39404*900 # = 35463600 m^2
+35463600/4046.86 # = 8763.239 acres
+# before filtering out small patches, was 836,608.2 acres
+
+plot(ARP_PCU_patches_classified)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ## polygons ----
 # in this step, we convert the above "patches" into polygons for ease of map making & calculating stats
+ARP_PCU_patches_classified
+ARP_PCU_vect <- as.polygons(ARP_PCU_patches_classified, values = FALSE) # has 60 geoms (polys)
+
+plot(ARP_PCU_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+### write & read ----
+writeVector(ARP_PCU_vect, "ARP_PCU_vect.shp")
+ARP_PCU_vect <- vect("ARP_PCU_vect.shp")
 
 ## attributes ----
 # in this step, we add attributes (metadata) to our polygons
