@@ -30,6 +30,7 @@ EVH_CO <- rast("EVH_CO.tif") # in EPSG: 5070
 
 ### crop / mask ----
 EVH_ARP <- crop(EVH_CO, ARP_vect, mask=TRUE)
+plot(EVH_ARP)
 
 ### classify 1 ----
 # create matrix so values <= 100 become NA (see all veg)
