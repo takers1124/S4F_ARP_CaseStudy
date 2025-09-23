@@ -255,7 +255,7 @@ freq(combined_rast)
 # how large of an area is this?
 73573+1456051+2032222+199972 # = 3761818 cells with values (min requirements met)
 3761818*900 # = 3385636200 square meters
-3385636200/4046.86 # 4046.86 m/acre = 836,608.2 acres
+3385636200/4046.86 # 4046.86 m/acre = 836608.2 acres
 
 ### write & read ----
 writeRaster(combined_rast, "combined_rast.tif")
@@ -267,7 +267,7 @@ combined_rast <- rast("combined_rast.tif")
   # so we will filter the data and make "patches" of high-scoring areas
     # we call these Potential Collection Units (PCUs)
 
-## filter 102 ----
+## (5.a) filter 102 ----
 ARP_PCU_102_rast <- combined_rast %>% 
   filter(score >= 102)
 
@@ -281,7 +281,11 @@ freq(ARP_PCU_102_rast)
   # 102 685213
   # 103 199972
 
-## filter 103 ----
+### write & read ----
+# writeRaster(ARP_PCU_102_rast, "ARP_PCU_102_rast.tif")
+# ARP_PCU_102_rast <- rast("ARP_PCU_102_rast.tif")
+
+## (5.a) filter 103 ----
 ARP_PCU_103_rast <- combined_rast %>% 
   filter(score >= 102.5)
 
@@ -305,9 +309,9 @@ freq(ARP_PCU_103_rast)
 
 
 
-## patches ----
+## (5.b) patches ----
 # in this step, we convert dense raster cells (with values) into "patches"
-ARP_PCU_patches <- patches(ARP_PCU_103_rast, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
+ARP_PCU_patches <- patches(ARP_PCU_102_rast, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
 
 plot(ARP_PCU_patches)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
@@ -315,45 +319,176 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 # looks pretty much the same, just the values are different
 
 ### explore ----
-# there are 47191  patches 
+# with a filter of >103, there are 47191  patches 
+# with a filter of >102, there are 112875 patches 
+
 patch_sizes <- freq(ARP_PCU_patches)
 patches_box <- boxplot(ARP_PCU_patches) # lots of low values
 
-## remove small patches ----
+## (5.c) remove small patches ----
 # 225 cells ~ 50 acres
-small_patches <- patch_sizes %>% filter(count <= 225) %>% select(value) # 47131 rows (patches)
-# so, the vast majority of patches are small 
+small_patches <- patch_sizes %>% filter(count <= 225) %>% select(value) 
+# with a filter of >103, there are 47131 rows (patches)
 47191-47131 # = 60 patches > 50 acres
+
+# with a filter of >102, there are 112439 rows (patches)
+112875-112439 # = 436 patches > 50 acres
+
+# so, the vast majority of patches are small 
 
 ### classify ----
 ARP_PCU_patches_classified <- classify(ARP_PCU_patches, rcl = cbind(small_patches, NA))
 plot(ARP_PCU_patches_classified)
 
 ### explore ----
-ARP_PCU_patches_freq <- freq(ARP_PCU_patches_classified) # confirmed, 60 patches
-ARP_PCU_cells <- sum(ARP_PCU_patches_freq$count) # 39,565 cells
+ARP_PCU_patches_freq <- freq(ARP_PCU_patches_classified) 
+# confirmed, with a filter of >103, there are 60 patches
+# confirmed, with a filter of >102, there are 436 patches
+
+ARP_PCU_cells <- sum(ARP_PCU_patches_freq$count) 
+# with a filter of >103, there are 39565 cells
 39404*900 # = 35463600 m^2
 35463600/4046.86 # = 8763.239 acres
-# before filtering out small patches, was 836,608.2 acres
+# before filtering out small patches, the total area of the combined raster was 836608.2 acres
+(8763.239/836608.2)*100 # = 1.1 % of total remains for scouting 
+
+# with a filter of >102, there are x cells
+387005*900 # = 348304500 m^2
+348304500/4046.86 # = 86067.84 acres
+# before filtering out small patches, the total area of the combined raster was 836608.2 acres
+(86067.84/836608.2)*100 # = 10.3 % of total remains for scouting
+
+# the less intense filtering (of >102) yields nearly 10x as much area to include in scouting
 
 plot(ARP_PCU_patches_classified)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
-## polygons ----
+## (5.d) polygons ----
 # in this step, we convert the above "patches" into polygons for ease of map making & calculating stats
-ARP_PCU_patches_classified
-ARP_PCU_vect <- as.polygons(ARP_PCU_patches_classified, values = FALSE) # has 60 geoms (polys)
+ARP_PCU_big_vect <- as.polygons(ARP_PCU_patches_classified, values = FALSE) 
+# with a filter of >103, this vect has 60 geoms (polys)
+# with a filter of >102, this vect has 436 geoms (polys)
 
-plot(ARP_PCU_vect)
+# the vect has no attributes, so will add an "original" ID attribute to correspond with the patch number
+ARP_PCU_big_vect$patch_ID <- 1:nrow(ARP_PCU_big_vect)
+
+plot(ARP_PCU_big_vect)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
-### write & read ----
-writeVector(ARP_PCU_vect, "ARP_PCU_vect.shp")
-ARP_PCU_vect <- vect("ARP_PCU_vect.shp")
+## (5.e) divide polygons ----
+### area ----
+# calc
+area_sqm <- expanse(ARP_PCU_big_vect, transform = FALSE)
+# transform = F bc already in an equal area projection 
+# convert units
+area_acres <- area_sqm * 0.000247105
+# 1 square meter = 0.000247105 acres
+# add as attribute
+ARP_PCU_big_vect$area_acres <- area_acres
+print(ARP_PCU_big_vect)
+ARP_PCU_big_df <- as.data.frame(ARP_PCU_big_vect)
+# polygon areas range from 50-3490 acres
 
-## attributes ----
+### divide ----
+# we want all polys to be of "operational size",
+# which we have set as between 50-200 acres
+
+# select for polys already within 50-200 acres & polys > 200
+small_polys <- ARP_PCU_big_vect[ARP_PCU_big_vect$area_acres <= 200, ] # 339 geoms
+large_polys <- ARP_PCU_big_vect[ARP_PCU_big_vect$area_acres > 200, ] # 97 geoms
+
+#### loop ----
+# create a list to store divided polys
+div_polys_list <- list()
+
+# iterate through each large_poly & add to list
+for (i in 1:nrow(large_polys)) {
+  poly <- large_polys[i, ]
+  original_id <- poly$patch_ID # store the original patch_ID as an attribute for divided polys
+  
+  # calc the number of parts needed
+  # we want a division that yields polygons around 100-150 acres (mid-range)
+  min_target_area <- 125 # acres
+  max_parts <- floor(poly$area_acres / 50) # ensure each poly is at least 50 acres
+  min_parts <- ceiling(poly$area_acres / 200) # ensure each poly is not > 200 acres
+  
+  num_parts <- round(poly$area_acres / min_target_area)
+  
+  # adjust num_parts to be within the min_parts and max_parts bounds
+  num_parts <- max(min_parts, num_parts)
+  num_parts <- min(max_parts, num_parts)
+  
+  # Ensure at least 2 parts if the polygon is large enough to be split
+  if (num_parts < 2 && poly$area_acres > 200) {
+    num_parts <- 2
+  }
+  
+  # use terra::divide()
+  # set diff seed for each poly to be divided
+  set.seed(i)
+  
+  divided_poly <- divide(poly, n = num_parts)
+  
+  # add the original ID to the new divided polys
+  divided_poly$original_id <- original_id
+  
+  # re-calc area 
+  divided_poly$area_acres_new <- expanse(divided_poly, transform = FALSE) * 0.000247105
+  
+  # store the new divided polys in the list
+  div_polys_list[[i]] <- divided_poly
+  
+}
+
+#### combine ----
+# combine all the split polys into a single spatvector
+if (length(div_polys_list) > 0) {
+  div_polys_vect <- do.call(rbind, div_polys_list)
+} else {
+  div_polys_vect <- NULL
+}
+
+div_polys_vect # has 439 geoms (new divided polys)
+
+# combine the original small_polys with the divided polys 
+if(!is.null(div_polys_vect)) {
+  ARP_PCUs_vect <- rbind(small_polys, div_polys_vect)
+} else {
+  ARP_PCUs_vect <- small_polys
+}
+
+ARP_PCUs_vect # has 778 geoms (339 original small + 439 new divided)
+
+#### verify ----
+# check the area again
+ARP_PCUs_vect$area_acres_final <- expanse(ARP_PCUs_vect, transform = FALSE) * 0.000247105
+summary(ARP_PCUs_vect$area_acres_final) # min = 41, max = 225 acres (close enough)
+hist(ARP_PCUs_vect$area_acres_final)
+
+# check if total area is preserved
+sum(ARP_PCU_big_vect$area_acres) # 86067.78 acres
+sum(ARP_PCUs_vect$area_acres_final) # 86067.78 - same! 
+
+# adjust final attributes 
+# add new ID col
+ARP_PCUs_vect$PCU_ID <- 1:nrow(ARP_PCUs_vect)
+# select only final area and new ID
+ARP_PCUs_vect <- ARP_PCUs_vect[, c("PCU_ID", "area_acres_final")]
+# rename the area col
+ARP_PCUs_vect <- ARP_PCUs_vect %>% 
+  rename(area_acres = area_acres_final)
+
+ARP_PCU_df <- as.data.frame(ARP_PCUs_vect)
+
+
+### write & read ----
+writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
+ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
+
+
+## (5.f) attributes ----
 # in this step, we add attributes (metadata) to our polygons
   # this is how we further filter & select PCUs for scouting
 # ex attributes:
