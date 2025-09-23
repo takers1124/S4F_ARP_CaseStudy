@@ -4,5 +4,5 @@
 .httr-oauth
 .DS_Store
 .quarto
-input_data/
-input_data.zip
+input_data_teaching/
+
