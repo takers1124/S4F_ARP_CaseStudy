@@ -36,6 +36,9 @@ ARP_vect <- NF_CO_vect %>%
 
 plot(ARP_vect)
 
+### read & write ----
+writeVector(ARP_vect, "ARP_vect.shp")
+
 ## reference points ----
 # we will add these 2 points as references, they represent Fort Collins and Boulder
 
@@ -55,6 +58,7 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 # cell values = probability of flame length > 8 ft
 
 ### * need to fill in----
+  # and/or modify to be CFP instead...
 
 ### write & read file ----
 ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
@@ -70,10 +74,53 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 # digital elevation model (DEM), downloaded from The National Map
 # cell values = degrees
 
-### * need to fill in----
+### load & process ----
+# these DEM rasters came from The National Map downloader (USGS)
+# they are 1 Arc Sec
+# these have GEOGCRS NAD83, but are not yet projected
+DEM_n41_w106 <- rast("USGS_1_n41w106_20230314.tif")
+DEM_n41_w107 <- rast("USGS_1_n41w107_20230314.tif")
+DEM_n40_w106 <- rast("USGS_1_n40w106_20230602.tif")
+DEM_n40_w107 <- rast("USGS_1_n40w107_20220216.tif")
+# mosaic 4 tiles together
+ARP_DEM <- mosaic(DEM_n41_w106, DEM_n41_w107, DEM_n40_w106, DEM_n40_w107, fun="first")
+# project
+ARP_DEM <- project(ARP_DEM, "EPSG:5070")
 
-### write & read file ----
+# crop and mask the DEM to the extent of ARP 
+ARP_DEM <- crop(ARP_DEM, ARP_vect, mask=TRUE)
+plot(ARP_DEM) # min = 1470.285 , max = 4393.409 
+
+### calc slope ----
+ARP_slope = terrain(ARP_DEM, v="slope", neighbors=8, unit="degrees")
+plot(ARP_slope)
+
+### classify (set NA values) ----
+#### ID values ----
+minmax(ARP_slope) # min = 0, max = 32.7273
+
+### create matrix ----
+m_slope = c(seq(0, 30, 2.7273), seq(2.7273, 32.7273, 2.7273), seq(0, 1, 0.1))
+# need to adjust these values when make final pass through
+mat_slope = matrix(m_slope, ncol=3, byrow=FALSE)
+
+### classify ----
+slope_class = classify(ARP_slope, mat_slope, other=NA) # other=NA, makes anything above 30* NA
+unique(slope_class)
+
+### plot ----
+plot(slope_class)
+plot(is.na(slope_class))
+
+## inverse ----
+ARP_slope_score_rast <- (1 - slope_class)
+plot(ARP_slope_score_rast)
+plot(is.na(ARP_slope_score_rast))
+
+## write & read ----
+writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
 ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
+
 
 ### viz ----
 plot(ARP_slope_score_rast)
@@ -82,9 +129,26 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 
 ## (3.c) road ----
-# this road raster was generated from a roads shapefile (lines)
 
-### * need to fill in----
+# import CO roads shapefile
+  # downloaded from The National Map
+Roads_CONUS <- vect("Trans_RoadSegment_0.shp")
+plot(Roads_CONUS)
+road_table <- as.data.frame(Roads_CONUS)
+crs(Roads_CONUS) # EPSG 4269
+
+## project, crop & mask ----
+Roads_proj = project(Roads_CONUS, EVH_CO)
+crs(Roads_proj) # EPSG 5070
+
+Roads_CO = crop(Roads_proj, CO, mask=TRUE)
+plot(Roads_CO)
+
+## rasterize ----
+CO_road_rast <- rasterize(Roads_CO, EVH, touches=TRUE)
+plot(CO_road_rast, col="blue") # all values = 1
+plot(is.na(CO_road_rast)) # values not 1 are NA
+# TBH, the raster does not look nearly as contiguous as the road lines from the .shp
 
 ### write & read file ----
 CO_road_rast <- rast("CO_road_rast.tif") 
@@ -145,8 +209,12 @@ ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
 ## (3.d) tree height ----
 # using existing vegetation height (EVH) from LANDFIRE
 
+EVH_CONUS <- rast("LC23_EVH_240.tif")
+crs(EVH_CONUS) # 5070
+res(EVH_CONUS) # 30 30
+
 ### crop / mask ----
-EVH_ARP <- crop(EVH_CO, ARP_vect, mask=TRUE)
+EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
 
 ### classify 1 ----
 # create matrix so values <= 100 become NA (see all veg)
