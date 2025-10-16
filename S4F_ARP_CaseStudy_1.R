@@ -433,6 +433,12 @@ patch_sizes <- freq(ARP_PCU_patches)
 patches_box <- boxplot(ARP_PCU_patches) # lots of low values
 
 ## (5.c) remove small patches ----
+# we want to remove patches smaller than 20 acres
+  # 20 acres = 80937.13 meters squared
+  # 1 pixel of 30x30 meters = 900 meters squared
+80937.13/900 # 89.93014 = number of pixels 
+
+### need to change this threshold in next run though 
 # 225 cells ~ 50 acres
 small_patches <- patch_sizes %>% filter(count <= 225) %>% select(value) 
 # with a filter of >103, there are 47131 rows (patches)
