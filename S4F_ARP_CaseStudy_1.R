@@ -296,12 +296,12 @@ ARP_height_rast <- rast("ARP_height_rast.tif")
 green_palette <- colorRampPalette(c("lightgreen", "darkgreen"))(25)  # Creates 25 shades of green
 
 # see height range
-plot(, col = green_palette)
+plot(ARP_height_rast, col = green_palette)
 
 ### classify ----
 # we want to treat any tree >= 20 ft equally, so make all...
-# cell value = 100
-ARP_height_rast <- rename(EVH_classified3)
+  # cell value = 100
+
 # see current height range
 minmax(ARP_height_rast)
 # min = 22.96588
@@ -321,6 +321,8 @@ ARP_height_score_rast = classify(ARP_height_rast, height_matrix, right=NA, other
 
 # see values
 unique(ARP_height_score_rast) # 100
+freq(ARP_height_score_rast) # 4711866 cells
+
 
 ### viz ----
 # see classified values
@@ -331,6 +333,63 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 ### write & read ----
 writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
 ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
+
+
+## (3.e) tree diameter ----
+# this is using quadratic mean diameter (QMD) from TreeMap 2022
+QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
+# already in 5070
+plot(QMD_CONUS)
+
+### crop and mask ----
+QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
+plot(QMD_ARP)
+
+
+### classify ----
+# we want to treat any area with >= 6 in QMD equally, so assign binary "score" to remaining cells
+  # choosing a "score" of 50 so that it can be easily distinguished from the other data
+    # risk, slope and road are 0-3 combined
+    # EVH is 100
+
+# see current qmd range
+minmax(QMD_ARP)
+# min = 1.08
+# max = 30.21
+
+# set sequence
+# from, to, becomes
+QMD_sequence = c(6, 30.21, 50)
+# we want to be able to distinguish the QMD priority from the others
+# so we make it 50! 
+
+# create matrix 
+QMD_matrix = matrix(QMD_sequence, ncol=3, byrow=TRUE)
+
+# classify
+ARP_qmd_score_rast = classify(QMD_ARP, QMD_matrix, right=NA, others=NA)
+
+# see values
+unique(ARP_qmd_score_rast) # 100
+freq(ARP_qmd_score_rast) # 3183744 cells
+
+global(QMD_ARP, fun = "notNA") # 5697616
+# before filtering out QMD < 6 in, the QMD_ARP raster had 5697616 valid cells
+(3183744/5697616)*100 # = 55.87853 % of total remains after the filter
+
+3183744*900 # = 2865369600 m^2
+2865369600/4046.86 # = 708047.6 acres
+
+### viz ----
+# see classified values
+plot(ARP_qmd_score_rast, col = "darkgreen")
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+### write & read ----
+writeRaster(ARP_qmd_score_rast, "ARP_qmd_score_rast.tif")
+ARP_qmd_score_rast <- rast("ARP_qmd_score_rast.tif")
+
 
 
 
