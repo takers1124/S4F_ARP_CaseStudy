@@ -1,4 +1,4 @@
-# desctiption ----
+# description ----
 
 # Seeds 4 the Future ARP Case Study, the full script
 # part 1, create Potential Collection Units (PCUs)
@@ -20,29 +20,31 @@ library(ggplot2) # for fancy plotting
 
 # the Area of Interest (AOI) for this case study is the Arapaho-Roosevelt National Forest (ARP)
 ## ARP ----
+### load & process ----
+NF_CONUS_vect <- vect("S_USA.FSCommonNames.shp")
 
-### read file ----
-NF_CO_vect <- vect("NF_CO_vect.shp")
+plot(NF_CONUS_vect)
 
-### viz ----
-plot(NF_CO_vect)
+# see unique names 
+unique(NF_CONUS_vect$COMMONNAME)
 
-### see unique names ----
-unique(NF_CO_vect$COMMONNAME)
-
-### select for just ARP ----
-ARP_vect <- NF_CO_vect %>%
+# select for just ARP 
+ARP_vect <- NF_CONUS_vect %>%
   filter(COMMONNAME == "Arapaho and Roosevelt National Forests")
 
 plot(ARP_vect)
 
-### read & write ----
+# project 
+ARP_vect <- project(ARP_vect,"EPSG:5070")
+
+### write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
+ARP_vect <- vect("ARP_vect.shp")
 
 ## reference points ----
 # we will add these 2 points as references, they represent Fort Collins and Boulder
 
-### read file ----
+### write & read ----
 CO_refs_vect <- vect("CO_refs_vect.shp")
 
 ### viz ----
@@ -68,16 +70,33 @@ plot(ARP_risk_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
+## (3.a) risk CFP ----
+### load & process ----
+CFP_49_41 <- rast("crown_fire_2025_c00049_r00041.tif")
+CFP_50_41 <- rast("crown_fire_2025_c00050_r00041.tif")
+CFP_50_40 <- rast("crown_fire_2025_c00050_r00040.tif")
+# CRS already in 5070
+
+# combine
+CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
+plot(CFP_mosaic)
+
+# crop and mask  
+CFP_ARP <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
+plot(CFP_ARP)
+
+# the raster values are already 0-1 (probability)
+  # value 1 = highest risk
+  # no need to classify or calc inverse score
+
 
 ## (3.b) slope ----
-# this slope raster is generated using a 
-# digital elevation model (DEM), downloaded from The National Map
-# cell values = degrees
+# this slope raster is generated using  
+# digital elevation model (DEM) tiles, downloaded from The National Map (USGS)
+# they are 1 Arc Sec
+# these tiles have GEOGCRS NAD83, but are not yet projected
 
 ### load & process ----
-# these DEM rasters came from The National Map downloader (USGS)
-# they are 1 Arc Sec
-# these have GEOGCRS NAD83, but are not yet projected
 DEM_n41_w106 <- rast("USGS_1_n41w106_20230314.tif")
 DEM_n41_w107 <- rast("USGS_1_n41w107_20230314.tif")
 DEM_n40_w106 <- rast("USGS_1_n40w106_20230602.tif")
@@ -89,7 +108,11 @@ ARP_DEM <- project(ARP_DEM, "EPSG:5070")
 
 # crop and mask the DEM to the extent of ARP 
 ARP_DEM <- crop(ARP_DEM, ARP_vect, mask=TRUE)
-plot(ARP_DEM) # min = 1470.285 , max = 4393.409 
+plot(ARP_DEM) # min = 1470.285 , max = 4393.409 (meters)
+
+### write & read ----
+writeRaster(ARP_DEM, "ARP_DEM.tif")
+ARP_DEM <- rast("ARP_DEM.tif")
 
 ### calc slope ----
 ARP_slope = terrain(ARP_DEM, v="slope", neighbors=8, unit="degrees")
@@ -98,6 +121,9 @@ plot(ARP_slope)
 ### classify (set NA values) ----
 #### ID values ----
 minmax(ARP_slope) # min = 0, max = 32.7273
+# min = 0, max = 78.42657 
+# but the max we want to include is 24 degrees
+24/11 # 2.181818
 
 ### create matrix ----
 m_slope = c(seq(0, 30, 2.7273), seq(2.7273, 32.7273, 2.7273), seq(0, 1, 0.1))
@@ -699,22 +725,9 @@ ARP_PCUs_vect$seed_zone <- extract_SZ$ZONE_NO
 
 ##
 ## (6.c) elevation band ----
-### load & process ----
-# these DEM rasters came from The National Map downloader (USGS)
-# they are 1 Arc Sec
-# these have GEOGCRS NAD83, but are not yet projected
-DEM_n41_w106 <- rast("USGS_1_n41w106_20230314.tif")
-DEM_n41_w107 <- rast("USGS_1_n41w107_20230314.tif")
-DEM_n40_w106 <- rast("USGS_1_n40w106_20230602.tif")
-DEM_n40_w107 <- rast("USGS_1_n40w107_20220216.tif")
-# mosaic 4 tiles together
-DEM_ARP <- mosaic(DEM_n41_w106, DEM_n41_w107, DEM_n40_w106, DEM_n40_w107, fun="first")
-# project
-DEM_ARP <- project(DEM_ARP, "EPSG:5070")
+# using ARP_DEM created in part 3.b
+ARP_DEM <- rast("ARP_DEM.tif")
 
-# crop and mask the DEM to the extent of ARP 
-DEM_ARP <- crop(DEM_ARP, ARP_vect, mask=TRUE)
-plot(DEM_ARP) # min = 1470.285 , max = 4393.409 
 
 ### classify EB ----
 # the DEM is in meters, but we want 500ft EBs
