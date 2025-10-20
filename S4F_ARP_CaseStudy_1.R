@@ -71,6 +71,8 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ## (3.a) risk CFP ----
+# using the crown fire probability (CFP) dataset from Pyrologix 
+
 ### load & process ----
 CFP_49_41 <- rast("crown_fire_2025_c00049_r00041.tif")
 CFP_50_41 <- rast("crown_fire_2025_c00050_r00041.tif")
@@ -82,21 +84,37 @@ CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
 plot(CFP_mosaic)
 
 # crop and mask  
-CFP_ARP <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
-plot(CFP_ARP)
+ARP_risk_score_rast <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
+plot(ARP_risk_score_rast)
 
 # the raster values are already 0-1 (probability)
   # value 1 = highest risk
-  # no need to classify or calc inverse score
+  # no need to classify or calc inverse score (like other priority factors)
+
+### write & read file ----
+writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
+ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
+
+### viz ----
+plot(ARP_risk_score_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+### stats ----
+global(ARP_risk_score_rast, fun = "notNA") # 7776004 cells 
+all_risk_count <- sum(ARP_risk_score_rast[] >= 0, na.rm = TRUE) # 7776004 cells
+
+7776004*900 # = 6998403600 m^2
+6998403600/4046.86 # = 1729342 acres (the entire ARP)
 
 
 ## (3.b) slope ----
 # this slope raster is generated using  
-# digital elevation model (DEM) tiles, downloaded from The National Map (USGS)
-# they are 1 Arc Sec
-# these tiles have GEOGCRS NAD83, but are not yet projected
+  # digital elevation model (DEM) tiles, downloaded from The National Map (USGS)
+  # they are 1 Arc Sec
+  # these tiles have GEOGCRS NAD83, but are not yet projected
 
-### load & process ----
+### load & process DEMs ----
 DEM_n41_w106 <- rast("USGS_1_n41w106_20230314.tif")
 DEM_n41_w107 <- rast("USGS_1_n41w107_20230314.tif")
 DEM_n40_w106 <- rast("USGS_1_n40w106_20230602.tif")
@@ -118,122 +136,130 @@ ARP_DEM <- rast("ARP_DEM.tif")
 ARP_slope = terrain(ARP_DEM, v="slope", neighbors=8, unit="degrees")
 plot(ARP_slope)
 
-### classify (set NA values) ----
-#### ID values ----
-minmax(ARP_slope) # min = 0, max = 32.7273
-# min = 0, max = 78.42657 
-# but the max we want to include is 24 degrees
-24/11 # 2.181818
+### adjust values ----
+minmax(ARP_slope) 
+# min = 0, max = 72.59397 
+  # but the max we want to include is 24 degrees
+  # and we want 0-24 degree slope to become 0-1 score (normalize)
 
-### create matrix ----
-m_slope = c(seq(0, 30, 2.7273), seq(2.7273, 32.7273, 2.7273), seq(0, 1, 0.1))
-# need to adjust these values when make final pass through
-mat_slope = matrix(m_slope, ncol=3, byrow=FALSE)
+# make all values > 24 degrees NA, leave other values as-is
+slope_filtered <- ifel(ARP_slope > 24, NA, ARP_slope)
+plot(slope_filtered)
 
-### classify ----
-slope_class = classify(ARP_slope, mat_slope, other=NA) # other=NA, makes anything above 30* NA
-unique(slope_class)
+# normalize scale
+slope_norm <- slope_filtered / 24
+plot(slope_norm)
 
-### plot ----
-plot(slope_class)
-plot(is.na(slope_class))
-
-## inverse ----
-ARP_slope_score_rast <- (1 - slope_class)
+# calc inverse
+ARP_slope_score_rast <- (1 - slope_norm)
 plot(ARP_slope_score_rast)
 plot(is.na(ARP_slope_score_rast))
 
-## write & read ----
+### write & read ----
 writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
 ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
-
 
 ### viz ----
 plot(ARP_slope_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
+### stats ----
+global(ARP_slope_score_rast, fun = "notNA") # 7433981 cells 
+sum(ARP_slope_score_rast[] >= 0, na.rm = TRUE) # 7433981 cells
+
+7433981*900 # = 6690582900 m^2
+6690582900/4046.86 # = 1653278 acres (all areas < 24* slope)
+
+# entire ARP = 7776004 cells & 1729342 acres
+(7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
+(1653278/1729342)*100 # 95.60156 %
 
 ## (3.c) road ----
 
 # import CO roads shapefile
   # downloaded from The National Map
-Roads_CONUS <- vect("Trans_RoadSegment_0.shp")
-plot(Roads_CONUS)
-road_table <- as.data.frame(Roads_CONUS)
-crs(Roads_CONUS) # EPSG 4269
+roads_CONUS <- vect("Trans_RoadSegment_0.shp")
+plot(roads_CONUS)
+road_table <- as.data.frame(roads_CONUS)
+crs(roads_CONUS) # EPSG 4269
 
 ## project, crop & mask ----
-Roads_proj = project(Roads_CONUS, EVH_CO)
-crs(Roads_proj) # EPSG 5070
+roads_CONUS = project(roads_CONUS, EVH_CO)
+crs(roads_CONUS) # EPSG 5070
 
-Roads_CO = crop(Roads_proj, CO, mask=TRUE)
+roads_CO = crop(roads_CONUS, CO, mask=TRUE)
 plot(Roads_CO)
 
 ## rasterize ----
-CO_road_rast <- rasterize(Roads_CO, EVH, touches=TRUE)
+CO_road_rast <- rasterize(roads_CO, EVH, touches=TRUE)
 plot(CO_road_rast, col="blue") # all values = 1
 plot(is.na(CO_road_rast)) # values not 1 are NA
 # TBH, the raster does not look nearly as contiguous as the road lines from the .shp
+  # but when I open the .tif in Arc, it looks fine 
+  # I think it is too much for R studio to render with plot()
 
 ### write & read file ----
 CO_road_rast <- rast("CO_road_rast.tif") 
-plot(CO_road_rast)
+plot(CO_road_rast, col = "blue")
 
-### crop & mask ----
+## crop & mask ----
 # here we use the ARP_vect polygon to crop (and mask) only the area we want from the raster
 ARP_road_rast <- crop(CO_road_rast, ARP_vect, mask=TRUE)
-plot(ARP_road_rast)
+plot(ARP_road_rast, col = "blue")
 
-### distance ----
+## distance ----
 # we will calculate the distance to nearest road for each raster cell (pixel)
 ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine") 
 plot(ARP_road_dist_rast)
 # cell values = distance to nearest road (in meters)
 
-### classify ----
-# now going to set a 1 mi threshold, and make all other values NA
-# 1 mile = 1609.34 meters (second to last value of col 2 & threshold value for score)
-1609.34/11 # = 146.3036 (start of col 2 & breaks for cols 1 and 2)
-1609.34-146.3036 # = 1463.036 (end of col 1)
-minmax(ARP_road_dist_rast) # min = 0, ARP max = 37416.17 (end of col 2)
+### adjust values ----
+minmax(ARP_road_dist_rast) 
+# min = 0, max = 37416.17 
+  # but the max we want to include is 917.3261 meters (0.57 miles)
+  # and we want 0-917 m distance to become 0-1 score (normalize)
 
-# set sequence
-# from, to, becomes
-road_sequence = c(c(seq(0, 1463.036, 146.3036),1609.34), c(seq(146.3036, 1609.34, 146.3036),37416.17), c(seq(0, 1, 0.1),NA))
-# 1609.34 is the cutoff (final row of col 1, second to last of col 2)
-# 37416.17 is the max road length in the ARP (end of col 2)
-# from 1609.34 to 37416.17 becomes NA, while the other lower values become 0-1
+# make all values > 917.3261 degrees NA, leave other values as-is
+road_filtered <- ifel(ARP_road_dist_rast > 917.3261, NA, ARP_road_dist_rast)
+plot(road_filtered)
 
-# create matrix
-road_matrix = matrix(road_sequence, ncol=3, byrow=FALSE)
-# viz matrix
+# normalize scale
+road_norm <- road_filtered / 917.3261
+plot(road_norm)
 
-# classify
-ARP_road_class_rast = classify(ARP_road_dist_rast, road_matrix, right=NA, others=NA)
-plot(ARP_road_class_rast)
-
-### inverse score ---- 
-ARP_road_inv_rast <- (1 - ARP_road_class_rast)
-plot(ARP_road_inv_rast)
-plot(is.na(ARP_road_inv_rast)) # just a visual check
-
-### crop & mask ----
-# do again because distance made a buffer that goes beyond ARP
-ARP_road_score_rast <- crop(ARP_road_inv_rast, ARP_vect, mask=TRUE)
+# calc inverse
+ARP_road_score_rast <- (1 - road_norm)
+plot(ARP_road_score_rast)
+plot(is.na(ARP_road_score_rast))
 
 ### viz ----
 plot(ARP_road_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
+### stats ----
+global(ARP_road_score_rast, fun = "notNA") # 5850375 cells 
+sum(ARP_road_score_rast[] >= 0, na.rm = TRUE) # 5850375 cells
+
+5850375*900 # = 5265337500 m^2
+5265337500/4046.86 # = 1301092 acres (all areas < 0.57 miles from roads)
+
+# entire ARP = 7776004 cells & 1729342 acres
+(5850375/7776004)*100 # 75.23627 % remaining after 24 degree filter 
+(1301092/1729342)*100 # 75.23627 %
+
 ### write & read ----
 writeRaster(ARP_road_score_rast, "ARP_road_score_rast.tif")
 ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
 
 
+
 ## (3.d) tree height ----
 # using existing vegetation height (EVH) from LANDFIRE
+  # these values are not continuous
+  # also the veg height has an offset added
+    # e.g. value 103 = tree height of 3 meters
 
 EVH_CONUS <- rast("LC23_EVH_240.tif")
 crs(EVH_CONUS) # 5070
@@ -242,123 +268,58 @@ res(EVH_CONUS) # 30 30
 ### crop / mask ----
 EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
 
-### classify 1 ----
-# create matrix so values <= 100 become NA (see all veg)
-EVH_matrix <- matrix(c(-Inf, 100, NA), ncol = 3, byrow = TRUE)
-
-# Classify the raster using the matrix, keeping unmatched values
-EVH_classified <- classify(EVH_ARP, EVH_matrix, others = NULL)
-
-#### plot ----
-plot(EVH_classified)
-polys(ARP, col = "black", alpha=0.01, lwd=2)
-points(CSU, pch = 19, col = "orange", cex = 1.5)
-points(CU, pch = 19, col = "orange", cex = 1.5)
-
-### classify 2 ----
-# create matrix so values <= 100 become NA & values >= 200 become NA (see only trees)
-EVH_matrix2 <- matrix(c(-Inf, 100, NA, 200, Inf, NA), ncol = 3, byrow = TRUE)
-EVH_classified2 <- classify(EVH_ARP, EVH_matrix2, others = NULL) # values 101:125
-
-# make special color pallet 
-green_palette <- colorRampPalette(c("lightgreen", "darkgreen"))(25)  # Creates 25 shades of green
-
-#### plot ----
-plot(EVH_classified2, col = green_palette)
-polys(ARP, col = "black", alpha=0.01, lwd=2)
-points(CSU, pch = 19, col = "orange", cex = 1.5)
-points(CU, pch = 19, col = "orange", cex = 1.5)
-
-### classify 3 ----
-# create matrix so only including trees > 20ft & also making scale in ft
-
-# 1. Define the conversion factor from meters to feet
-# 1 meter is approximately 3.28084 feet
+### adjust values ----
+# define conversion factor
 meters_to_feet_factor <- 3.28084
 
-# 2. Create the reclassification matrix
-# This matrix will define the "from", "to", and "becomes" values.
-#  - First, convert the original meter values (101-125) to their true meter representation (1-25)
-#  - Then, convert these true meter values to feet.
-#  - Finally, set values less than 20 feet to NA.
+# reclassify with ifel()
+ARP_height_score_rast <- ifel(
+  # condition 1: it is dominant veg type trees? (values 100-199)
+  EVH_ARP >= 100 & EVH_ARP < 200,
+  # if TRUE, 
+    # condition 2: is it > 10 ft tall? 
+  ifel(
+    (EVH_ARP - 100) * meters_to_feet_factor > 20, # subtract offset, convert units, filter
+    100, # if TRUE, reclassify to 100
+    NA # if FALSE, reclassify to NA
+  ),
+  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
+)
 
-# 3. Initialize an empty matrix
-rcl_matrix <- matrix(NA, ncol = 2, byrow = TRUE)
+### stats ----
+# entire ARP = 7776004 cells & 1729342 acres
 
-# 4. Create rows for the matrix based on meter ranges
-# Loop through the *original* meter values (101-125)
-for (original_meter_value in 101:125) {
-  # Calculate the true meter value by subtracting the offset (100)
-  true_meter_value <- original_meter_value - 100
-  
-  # Convert the true meter value to feet
-  feet_value <- true_meter_value * meters_to_feet_factor
-  
-  if (feet_value < 20) {
-    rcl_matrix <- rbind(rcl_matrix, c(original_meter_value, NA))  # Values < 20 ft become NA
-  } else {
-    rcl_matrix <- rbind(rcl_matrix, c(original_meter_value, feet_value)) # Values >= 20 ft retain converted value
-  }
-}
+# all veg area
+sum(EVH_ARP[] >= 100, na.rm = TRUE) # 7004697 cells
 
-# 5. Remove the initial NA row
-rcl_matrix <- rcl_matrix[-1, ]
+7004697*900 # = 6304227300 m^2
+6304227300/4046.86 # = 1557807 acres (all veg type in ARP)
+(1557807/1729342)*100 # 90.08091 % of ARP is vegetated 
 
-# 6. Classify the raster using the reclassification matrix
-EVH_classified3 <- classify(EVH_classified2, rcl_matrix, others = NULL) 
+# all tree area
+sum(EVH_ARP[] >= 100 & EVH_ARP[] < 200, na.rm = TRUE) # 5324379 cells
 
-#### plot ----
-plot(EVH_classified3, col = green_palette)
-polys(ARP, col = "black", alpha=0.01, lwd=2)
-points(CSU, pch = 19, col = "orange", cex = 1.5)
-points(CU, pch = 19, col = "orange", cex = 1.5)
+5324379*900 # = 4791941100 m^2
+4791941100/4046.86 # = 1184113 acres (all trees in ARP)
+(1184113/1729342)*100 # 68.47188 % of ARP has trees 
 
-#### write & read ----
-writeRaster(EVH_classified3, "ARP_height_rast.tif")
-ARP_height_rast <- rast("ARP_height_rast.tif")
+# trees > 10 ft area
+sum(ARP_height_score_rast[] == 100, na.rm = TRUE) # 4933551 cells
 
-### viz ----
-# make special color pallet 
-green_palette <- colorRampPalette(c("lightgreen", "darkgreen"))(25)  # Creates 25 shades of green
-
-# see height range
-plot(ARP_height_rast, col = green_palette)
-
-### classify ----
-# we want to treat any tree >= 20 ft equally, so make all...
-  # cell value = 100
-
-# see current height range
-minmax(ARP_height_rast)
-# min = 22.96588
-# max = 82.02100
-
-# set sequence
-# from, to, becomes
-height_sequence = c(22.96588,82.02100,100)
-# we want to be able to distinguish the height priority from the others
-# so we make it 100! 
-
-# create matrix 
-height_matrix = matrix(height_sequence, ncol=3, byrow=TRUE)
-
-# classify
-ARP_height_score_rast = classify(ARP_height_rast, height_matrix, right=NA, others=NA)
-
-# see values
-unique(ARP_height_score_rast) # 100
-freq(ARP_height_score_rast) # 4711866 cells
+4933551*900 # = 4440195900 m^2
+4440195900/4046.86 # = 1097195 acres (all trees in ARP > 10 ft)
+(1097195/1729342)*100 # 63.44581 % of ARP has trees
 
 
 ### viz ----
-# see classified values
-plot(ARP_height_score_rast, col = "darkgreen")
+plot(ARP_height_score_rast, col = "forestgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
 ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
+
 
 
 ## (3.e) tree diameter ----
@@ -371,51 +332,39 @@ plot(QMD_CONUS)
 QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
 plot(QMD_ARP)
 
+# reclassify with ifel()
+ARP_diameter_score_rast <- ifel(
+  QMD_ARP >= 6, 50, NA 
+)
+# if >= 6 inches, reclassify to 50
+# if < 6 inches, reclassify to NA
 
-### classify ----
-# we want to treat any area with >= 6 in QMD equally, so assign binary "score" to remaining cells
-  # choosing a "score" of 50 so that it can be easily distinguished from the other data
-    # risk, slope and road are 0-3 combined
-    # EVH is 100
 
-# see current qmd range
-minmax(QMD_ARP)
-# min = 1.08
-# max = 30.21
+### stats ----
+# entire ARP = 7776004 cells & 1729342 acres
+# all areas with QMD values
+sum(QMD_ARP[] >= 0, na.rm = TRUE) # 5697616 cells 
+5697616*900 # 5127854400 meters squared
+5127854400/4046.86 # = 1267119 acres (all area with QMD values in ARP)
+(1267119/1729342)*100 # 73.27174 % of ARP has QMD values
 
-# set sequence
-# from, to, becomes
-QMD_sequence = c(6, 30.21, 50)
-# we want to be able to distinguish the QMD priority from the others
-# so we make it 50! 
-
-# create matrix 
-QMD_matrix = matrix(QMD_sequence, ncol=3, byrow=TRUE)
-
-# classify
-ARP_qmd_score_rast = classify(QMD_ARP, QMD_matrix, right=NA, others=NA)
-
-# see values
-unique(ARP_qmd_score_rast) # 100
-freq(ARP_qmd_score_rast) # 3183744 cells
-
-global(QMD_ARP, fun = "notNA") # 5697616
-# before filtering out QMD < 6 in, the QMD_ARP raster had 5697616 valid cells
-(3183744/5697616)*100 # = 55.87853 % of total remains after the filter
+# areas with QMD > 6 inches
+sum(ARP_diameter_score_rast[] == 50, na.rm = TRUE) # 3183744 cells
 
 3183744*900 # = 2865369600 m^2
-2865369600/4046.86 # = 708047.6 acres
+2865369600/4046.86 # = 708047.6 acres (all trees in ARP > 6 in QMD)
+(708047.6/1729342)*100 # 40.94318 % of ARP has trees > 6 in QMD
+
 
 ### viz ----
 # see classified values
-plot(ARP_qmd_score_rast, col = "darkgreen")
+plot(ARP_diameter_score_rast, col = "darkgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
-writeRaster(ARP_qmd_score_rast, "ARP_qmd_score_rast.tif")
-ARP_qmd_score_rast <- rast("ARP_qmd_score_rast.tif")
-
+writeRaster(ARP_diameter_score_rast, "ARP_diameter_score_rast.tif")
+ARP_diameter_score_rast <- rast("ARP_diameter_score_rast.tif")
 
 
 
