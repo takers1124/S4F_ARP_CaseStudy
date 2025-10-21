@@ -184,14 +184,14 @@ plot(roads_CONUS)
 road_table <- as.data.frame(roads_CONUS)
 crs(roads_CONUS) # EPSG 4269
 
-## project, crop & mask ----
+# project, crop & mask 
 roads_CONUS = project(roads_CONUS, EVH_CO)
 crs(roads_CONUS) # EPSG 5070
 
 roads_CO = crop(roads_CONUS, CO, mask=TRUE)
 plot(Roads_CO)
 
-## rasterize ----
+### rasterize ----
 CO_road_rast <- rasterize(roads_CO, EVH, touches=TRUE)
 plot(CO_road_rast, col="blue") # all values = 1
 plot(is.na(CO_road_rast)) # values not 1 are NA
@@ -203,12 +203,12 @@ plot(is.na(CO_road_rast)) # values not 1 are NA
 CO_road_rast <- rast("CO_road_rast.tif") 
 plot(CO_road_rast, col = "blue")
 
-## crop & mask ----
+# crop & mask 
 # here we use the ARP_vect polygon to crop (and mask) only the area we want from the raster
 ARP_road_rast <- crop(CO_road_rast, ARP_vect, mask=TRUE)
 plot(ARP_road_rast, col = "blue")
 
-## distance ----
+### distance ----
 # we will calculate the distance to nearest road for each raster cell (pixel)
 ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine") 
 plot(ARP_road_dist_rast)
@@ -370,21 +370,134 @@ ARP_diameter_score_rast <- rast("ARP_diameter_score_rast.tif")
 
 # (4) combine data ----
 
-# now we will do some raster math
-# sum the cell values among the 4 data layers
-# if a cell for any layer = NA, then NA is returned
+## resample ----
+# first, the rasters need to be resampled so their extents align,
+  # and they have matching resolutions and origins 
+# 4 of the 5 rasters have the same resolution
+# 3 of the 5 rasters already have matching extents
+  # I am randomly choosing 1 of those 3 to use as the template
+    # raster [[5]] in the list
 
-combined_rast <- sum(ARP_risk_score_rast, ARP_slope_score_rast, ARP_road_score_rast, ARP_height_score_rast, na.rm=FALSE) %>% 
-  rename(score = FLEP8_CO)
+# make a raster list 
+raster_list <- list(ARP_risk_score_rast, ARP_slope_score_rast, 
+                    ARP_road_score_rast, ARP_height_score_rast, 
+                    ARP_diameter_score_rast)
 
-### viz ----
-plot(combined_rast)
+# set template for resampling
+template_raster <- raster_list[[5]]
 
-# note, all these areas meet our basic criteria (3.a - 3.d)
-# however, it is still too large of an area to scout
-# so, we must narrow it down further
+# resample the remaining rasters to match the template
+# rasters 1, 2, and 3 in the list have continuous values
+  # use bilinear interpolation 
+resampled_continuous <- lapply(raster_list[1:3], function(r) {
+    resample(r, template_raster, method = "bilinear")
+})
 
-### explore ----
+# rasters 4 and 5 in the list have binary values 
+  # use nearest neighbor
+resampled_binary <- lapply(raster_list[4:5], function(r) {
+  resample(r, template_raster, method = "near")
+})
+
+# combine into new list
+resampled_rast_list <- c(resampled_continuous, resampled_binary)
+  # all 5 rasters have same extent, resolution, etc
+
+# create a multi-layer raster stack 
+resampled_rast_stack <- rast(resampled_rast_list)
+  # has 5 layers
+
+## sum ----
+combined_raster <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+  # has values: min = 0, max = 153
+
+## viz ----
+plot(combined_raster)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+# the combined_raster extends a bit beyond the ARP boundary
+  # crop & mask again
+ARP_combined_rast <- crop(combined_raster, ARP_vect, mask = TRUE)
+
+plot(ARP_combined_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+## stats ----
+# want to know how many cells (and how much area) falls into each category
+  # ca 0: all values not NA
+global(ARP_combined_rast, fun = "notNA") # 7,775,581 cells 
+7775581*900 # 6998022900 m^2
+6998022900/4046.86 # 1729248 acres (meet at least 1 of the priority factory)
+(1729248/1729342)*100 # 99.99456 % of ARP 
+
+# cat 1: values 0-3
+    # slope, road, and risk combined & continuous values
+global(ARP_combined_rast >= 0 & ARP_combined_rast <= 3, fun = "sum", na.rm = TRUE) # 2469181 cells
+2469181*900 # 2222262900 m^2
+2222262900/4046.86 # 549132.6 acres (only meets slope, road, and/or risk)
+(549132.6/1729342)*100 # 31.75385 % of ARP 
+
+# cat 2: values 50-53
+  # just meet's QMD threshold
+global(ARP_combined_rast >= 50 & ARP_combined_rast <= 53, fun = "sum", na.rm = TRUE) # 372849 cells
+372849*900 # 335564100 m^2
+335564100/4046.86 # 82919.62 acres (QMD and cat 1)
+(82919.62/1729342)*100 # 4.794865 % of ARP 
+
+# cat 3: values 100-103
+  # just meet's EVH threshold
+global(ARP_combined_rast >= 100 & ARP_combined_rast <= 103, fun = "sum", na.rm = TRUE) # 2122656 cells
+2122656*900 # 1910390400 m^2
+1910390400/4046.86 # 472067.3 acres (EVH and cat 1)
+(472067.3/1729342)*100 # 27.29751 % of ARP 
+
+# cat 4: values 150-153
+  # meet both QMD and EVH thresholds
+global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "sum", na.rm = TRUE) # 2810895 cells
+2810895*900 # 2529805500 m^2
+2529805500/4046.86 # 625128 acres (QMD & EVH & cat 1)
+(625128/1729342)*100 # 36.14832 % of ARP
+
+## QC ----
+# oh fuck, i think I messed up with global() and need to revisit this
+global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "notNA") # 7,775,581 cells
+global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "sum", na.rm = TRUE) # 2,810,895 cells
+
+
+freq(ARP_combined_rast)
+  # just add values 150-153
+154179+1331187+1273782+51747 # 2810895
+sum(ARP_combined_rast[] >= 150 & ARP_combined_rast[] <= 153, na.rm = TRUE) # 2810895
+
+
+31.75385+4.794865+27.29751+36.14832 # 99.99455 - it adds up! 
+
+## filter & rescale ----
+# final values can be 0-3 for ease of interpretation 
+
+ARP_priority_rast <- ifel(
+  ARP_combined_rast >= 150 & ARP_combined_rast <= 153,
+  ARP_combined_rast - 150, NA
+) %>% 
+  rename(priority_s = sum)
+
+# just confirm filter
+global(ARP_priority_rast, fun = "notNA") # 2810895 cells (same as Cat 4 ^)
+
+
+## viz ----
+plot(ARP_priority_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+
+## write & read ----
+writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
+ARP_priority_rast <- rast("ARP_priority_rast.tif")
+
+
+## stats V1 ----
 # see frequency of values
 freq(combined_rast)
 # value   count
@@ -397,12 +510,93 @@ freq(combined_rast)
 73573+1456051+2032222+199972 # = 3761818 cells with values (min requirements met)
 3761818*900 # = 3385636200 square meters
 3385636200/4046.86 # 4046.86 m/acre = 836608.2 acres
+(836608.2/1729342)*100 # 48.37726 % of ARP
 
-### write & read ----
-writeRaster(combined_rast, "combined_rast.tif")
-combined_rast <- rast("combined_rast.tif")
+# note, all these areas meet our basic criteria (3.a - 3.d)
+# however, it is still too large of an area to scout
+# so, we must narrow it down further (part 1-5)
 
-# (5) make PCUs ----
+
+
+# (5) make PCUs V2 ----
+
+# we need feasible (small) units to send the scouting crew
+# so we will filter the data and make "patches" of high-scoring areas
+# we call these Potential Collection Units (PCUs)
+
+
+## filter ----
+priority_filtered <- ifel(
+  ARP_priority_rast < 2, NA, ARP_priority_rast
+)
+
+# sanity checks
+freq(priority_filtered)
+409564+51747 # 461311
+global(priority_filtered, fun = "notNA") # 461311 cells
+sum(priority_filtered[] >= 0, na.rm = TRUE) # 461311
+
+461311*900 # 415179900 m^2
+415179900/4046.86 # 102593.1 acres
+(102593.1/1729342)*100 # 5.932493 % of ARP
+
+plot(priority_filtered)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+## patches ----
+# in this step, we convert connected raster cells (with values) into "patches"
+priority_patches <- patches(priority_filtered, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
+  # there are 68275 patches
+
+plot(priority_patches)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+## make polygons ----
+patch_polys <- as.polygons(priority_patches, values = FALSE)
+  # there are 68275 geometries 
+
+## separate sizes ----
+# calc area 
+patch_polys$area_acres <- expanse(patch_polys) * 0.000247105
+
+# filt out small poys (< 20 acres)
+small_polys_removed <- patch_polys[patch_polys$area_acres >= 20, ]
+
+# separate large polys ( > 200 acres) from others (20-200 acres)
+small_and_mid_polys <- small_polys_removed[small_polys_removed$area_acres <= 200, ]
+large_polys <- small_polys_removed[small_polys_removed$area_acres > 200, ]
+
+## divide ----
+# calculate divisions needed, ensuring at least 2 parts for large polys
+num_parts <- pmax(2, round(large_polys$area_acres / 125))
+
+# Use lapply to iterate and divide
+divided_polys_list <- lapply(1:nrow(large_polys), function(i) {
+  poly <- large_polys[i, ]
+  
+  # Set a seed to ensure reproducibility for the division process
+  set.seed(i)
+  
+  divided_poly <- divide(poly, n = num_parts[i])
+  
+  # Store the original ID and re-calculate the new areas
+  divided_poly$original_id <- poly$patch_ID
+  divided_poly$area_acres <- expanse(divided_poly) * 0.000247105
+  
+  return(divided_poly)
+})
+
+# Combine all divided polys into a single SpatVector
+divided_polys_vect <- do.call(rbind, divided_polys_list)
+
+# Combine the small/mid-sized polys with the newly divided large polys
+ARP_PCUs_vect <- rbind(small_and_mid_polys, divided_polys_vect)
+
+summary(ARP_PCUs_vect)
+# min = 20.02
+
+
+# (5) make PCUs V1 ----
 
 # we need feasible (small) units to send the scouting crew
 # so we will filter the data and make "patches" of high-scoring areas
