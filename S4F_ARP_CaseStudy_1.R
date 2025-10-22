@@ -460,19 +460,8 @@ global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "sum", na.rm =
 2529805500/4046.86 # 625128 acres (QMD & EVH & cat 1)
 (625128/1729342)*100 # 36.14832 % of ARP
 
-## QC ----
-# oh fuck, i think I messed up with global() and need to revisit this
-global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "notNA") # 7,775,581 cells
-global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "sum", na.rm = TRUE) # 2,810,895 cells
-
-
-freq(ARP_combined_rast)
-  # just add values 150-153
-154179+1331187+1273782+51747 # 2810895
-sum(ARP_combined_rast[] >= 150 & ARP_combined_rast[] <= 153, na.rm = TRUE) # 2810895
-
-
 31.75385+4.794865+27.29751+36.14832 # 99.99455 - it adds up! 
+
 
 ## filter & rescale ----
 # final values can be 0-3 for ease of interpretation 
@@ -545,6 +534,8 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 ## patches ----
 # in this step, we convert connected raster cells (with values) into "patches"
+  # btw this line can take several minutes to run
+  # and the more conservative the above filtering is (more area retained), the longer this will take
 priority_patches <- patches(priority_filtered, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
   # there are 68275 patches
 
@@ -555,45 +546,94 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 patch_polys <- as.polygons(priority_patches, values = FALSE)
   # there are 68275 geometries 
 
+# add a patch_ID attribute for each poly
+patch_polys$patch_ID <- 1:nrow(patch_polys) 
+
 ## separate sizes ----
 # calc area 
-patch_polys$area_acres <- expanse(patch_polys) * 0.000247105
+patch_polys$patch_acres <- expanse(patch_polys) * 0.000247105
 
 # filt out small poys (< 20 acres)
-small_polys_removed <- patch_polys[patch_polys$area_acres >= 20, ]
+small_polys_removed <- patch_polys[patch_polys$patch_acres >= 20, ]
+  # 589 geoms remain
+(589/68275)*100 # 0.862 % of polys remain (are >= 20 acres)
+  # but many of these are quite large and need to be divided
 
-# separate large polys ( > 200 acres) from others (20-200 acres)
-small_and_mid_polys <- small_polys_removed[small_polys_removed$area_acres <= 200, ]
-large_polys <- small_polys_removed[small_polys_removed$area_acres > 200, ]
+# separate mid-sized polys (20-200 acres)
+small_and_mid_polys <- small_polys_removed[small_polys_removed$patch_acres <= 200, ]
+  # 552 geoms
+(552/589)*100 # 93.72 % of polys >= 20 acres are also <= 200 acres
+
+# separate large polys ( > 200 acres)
+large_polys <- small_polys_removed[small_polys_removed$patch_acres > 200, ]
+  # 37 geoms
 
 ## divide ----
 # calculate divisions needed, ensuring at least 2 parts for large polys
-num_parts <- pmax(2, round(large_polys$area_acres / 125))
+num_parts <- pmax(2, round(large_polys$patch_acres / 125))
 
-# Use lapply to iterate and divide
+# use lapply to iterate and divide
 divided_polys_list <- lapply(1:nrow(large_polys), function(i) {
   poly <- large_polys[i, ]
   
-  # Set a seed to ensure reproducibility for the division process
+  # set a seed to ensure reproducibility for the division process
   set.seed(i)
   
   divided_poly <- divide(poly, n = num_parts[i])
   
-  # Store the original ID and re-calculate the new areas
-  divided_poly$original_id <- poly$patch_ID
-  divided_poly$area_acres <- expanse(divided_poly) * 0.000247105
+  # store the original ID and re-calculate the new areas
+  divided_poly$patch_ID <- poly$patch_ID
+  divided_poly$div_acres <- expanse(divided_poly) * 0.000247105
   
   return(divided_poly)
 })
 
-# Combine all divided polys into a single SpatVector
+# combine all divided polys into a single SpatVector
 divided_polys_vect <- do.call(rbind, divided_polys_list)
 
-# Combine the small/mid-sized polys with the newly divided large polys
+# combine the small/mid-sized polys with the newly divided large polys
 ARP_PCUs_vect <- rbind(small_and_mid_polys, divided_polys_vect)
 
+## adjust & stats ----
+
+# add new ID col & new final area col
+ARP_PCUs_vect$PCU_ID <- 1:nrow(ARP_PCUs_vect)
+ARP_PCUs_vect$area_acres <- expanse(ARP_PCUs_vect) * 0.000247105
+
 summary(ARP_PCUs_vect)
-# min = 20.02
+# area_acres min = 20.02, max = 206.80
+
+# select only new ID and area
+ARP_PCUs_vect <- ARP_PCUs_vect[, c("PCU_ID", "area_acres")]
+
+ARP_PCU_df <- as.data.frame(ARP_PCUs_vect)
+
+sum(ARP_PCUs_vect$area_acres) # 46297.15
+sum(small_polys_removed$patch_acres) # 46297.15
+  # bc these are =, we know the divide function worked (retained all area)
+
+(46297.15/1729342)*100 # 2.677154 % of ARP are highest priority areas (PCUs)
+
+# for reference, 
+(625128/1729342)*100 # 36.14832 % of ARP meets basic priorities
+  # slope, road, risk, height, diameter
+(46297.15/625128)*100 # 7.406027 % of the areas that meet basic priorities
+  # are the "highest priority" (PCUs)
+  # which have been (a) filtered for highest score, and (b) filtered for areas > 20 acres
+
+# for reference, in V1 (not including tree diameter, and with diff filters)
+  # final PCUs summed to 86067.78 acres
+(46297.15/86067.78)*100 # 53.7915 % of total area of PCUs in V1 are covered in V2
+100 - 53.7915 # 46.2085 % less area is included in PCUs of V2 than in V1
+
+
+## viz ----
+plot(ARP_PCUs_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+### write & read ----
+writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
+ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 
 
 # (5) make PCUs V1 ----
