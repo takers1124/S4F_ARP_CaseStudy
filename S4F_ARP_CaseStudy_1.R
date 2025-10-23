@@ -42,7 +42,9 @@ writeVector(ARP_vect, "ARP_vect.shp")
 ARP_vect <- vect("ARP_vect.shp")
 
 ## reference points ----
-# we will add these 2 points as references, they represent Fort Collins and Boulder
+# these are optional, and were created using the tidygeocoder package
+# we will add these 2 points as references for plotting, 
+  # they represent Fort Collins and Boulder
 
 ### write & read ----
 CO_refs_vect <- vect("CO_refs_vect.shp")
@@ -53,22 +55,6 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 
 # (3) pre-process data ----
-
-## (3.a) risk ----
-# using flame length exceedance probability of 8 ft (FLEP8)
-# as our proxy for risk of local extinction due to high severity wildfire
-# cell values = probability of flame length > 8 ft
-
-### * need to fill in----
-  # and/or modify to be CFP instead...
-
-### write & read file ----
-ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
-
-### viz ----
-plot(ARP_risk_score_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ## (3.a) risk CFP ----
 # using the crown fire probability (CFP) dataset from Pyrologix 
@@ -91,10 +77,6 @@ plot(ARP_risk_score_rast)
   # value 1 = highest risk
   # no need to classify or calc inverse score (like other priority factors)
 
-### write & read file ----
-writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
-ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
-
 ### viz ----
 plot(ARP_risk_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
@@ -102,10 +84,14 @@ points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### stats ----
 global(ARP_risk_score_rast, fun = "notNA") # 7776004 cells 
-all_risk_count <- sum(ARP_risk_score_rast[] >= 0, na.rm = TRUE) # 7776004 cells
+sum(ARP_risk_score_rast[] >= 0, na.rm = TRUE) # 7776004 cells
 
 7776004*900 # = 6998403600 m^2
 6998403600/4046.86 # = 1729342 acres (the entire ARP)
+
+### write & read file ----
+writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
+ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
 
 
 ## (3.b) slope ----
@@ -133,7 +119,7 @@ writeRaster(ARP_DEM, "ARP_DEM.tif")
 ARP_DEM <- rast("ARP_DEM.tif")
 
 ### calc slope ----
-ARP_slope = terrain(ARP_DEM, v="slope", neighbors=8, unit="degrees")
+ARP_slope = terrain(ARP_DEM, v="slope", unit="degrees")
 plot(ARP_slope)
 
 ### adjust values ----
@@ -150,30 +136,33 @@ plot(slope_filtered)
 slope_norm <- slope_filtered / 24
 plot(slope_norm)
 
-# calc inverse
+# calc inverse score
 ARP_slope_score_rast <- (1 - slope_norm)
-plot(ARP_slope_score_rast)
-plot(is.na(ARP_slope_score_rast))
-
-### write & read ----
-writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
-ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
 
 ### viz ----
 plot(ARP_slope_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
+plot(is.na(ARP_slope_score_rast))
+
 ### stats ----
 global(ARP_slope_score_rast, fun = "notNA") # 7433981 cells 
 sum(ARP_slope_score_rast[] >= 0, na.rm = TRUE) # 7433981 cells
 
 7433981*900 # = 6690582900 m^2
-6690582900/4046.86 # = 1653278 acres (all areas < 24* slope)
+6690582900/4046.86 # = 1,653,278 acres (all areas < 24* slope)
 
 # entire ARP = 7776004 cells & 1729342 acres
 (7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
 (1653278/1729342)*100 # 95.60156 %
+
+expanse(ARP_slope_score_rast, unit = "ha") # 565363.9 ha
+565363.9*2.47105381 # 1,397,045 acres
+
+### write & read ----
+writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
+ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
 
 ## (3.c) road ----
 
@@ -181,32 +170,29 @@ sum(ARP_slope_score_rast[] >= 0, na.rm = TRUE) # 7433981 cells
   # downloaded from The National Map
 roads_CONUS <- vect("Trans_RoadSegment_0.shp")
 plot(roads_CONUS)
-road_table <- as.data.frame(roads_CONUS)
 crs(roads_CONUS) # EPSG 4269
 
+road_df <- as.data.frame(roads_CONUS)
+# could filter by road type, we did not
+
 # project, crop & mask 
-roads_CONUS = project(roads_CONUS, EVH_CO)
+roads_CONUS = project(roads_CONUS, "EPSG:5070")
 crs(roads_CONUS) # EPSG 5070
 
-roads_CO = crop(roads_CONUS, CO, mask=TRUE)
-plot(Roads_CO)
+roads_ARP = crop(roads_CONUS, ARP_vect)
+plot(roads_ARP)
 
 ### rasterize ----
-CO_road_rast <- rasterize(roads_CO, EVH, touches=TRUE)
-plot(CO_road_rast, col="blue") # all values = 1
-plot(is.na(CO_road_rast)) # values not 1 are NA
+ARP_road_rast <- rasterize(roads_ARP, ARP_risk_score_rast , touches=TRUE)
+plot(ARP_road_rast, col="blue") # all values = 1
+plot(is.na(ARP_road_rast)) # values not 1 are NA
 # TBH, the raster does not look nearly as contiguous as the road lines from the .shp
   # but when I open the .tif in Arc, it looks fine 
   # I think it is too much for R studio to render with plot()
 
 ### write & read file ----
-CO_road_rast <- rast("CO_road_rast.tif") 
-plot(CO_road_rast, col = "blue")
-
-# crop & mask 
-# here we use the ARP_vect polygon to crop (and mask) only the area we want from the raster
-ARP_road_rast <- crop(CO_road_rast, ARP_vect, mask=TRUE)
-plot(ARP_road_rast, col = "blue")
+writeRaster(ARP_road_rast, "ARP_road_rast.tif")
+ARP_road_rast <- rast("ARP_road_rast.tif") 
 
 ### distance ----
 # we will calculate the distance to nearest road for each raster cell (pixel)
@@ -220,7 +206,7 @@ minmax(ARP_road_dist_rast)
   # but the max we want to include is 917.3261 meters (0.57 miles)
   # and we want 0-917 m distance to become 0-1 score (normalize)
 
-# make all values > 917.3261 degrees NA, leave other values as-is
+# make NA all values > 917.3261 meters, leave other values as-is
 road_filtered <- ifel(ARP_road_dist_rast > 917.3261, NA, ARP_road_dist_rast)
 plot(road_filtered)
 
@@ -279,7 +265,7 @@ ARP_height_score_rast <- ifel(
   # if TRUE, 
     # condition 2: is it > 10 ft tall? 
   ifel(
-    (EVH_ARP - 100) * meters_to_feet_factor > 20, # subtract offset, convert units, filter
+    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
     100, # if TRUE, reclassify to 100
     NA # if FALSE, reclassify to NA
   ),
@@ -891,6 +877,32 @@ str(extract_RDs)
 ARP_PCUs_vect$FORESTNAME <- extract_RDs$FORESTNAME 
 ARP_PCUs_vect$DISTRICTNA <- extract_RDs$DISTRICTNA 
 
+### relate ----
+intersecting_pairs <- relate(ARP_PCUs_vect, ARP_RDs, "intersects", pairs = TRUE)
+
+joined_polygons <- cbind(
+  ARP_PCUs_vect[intersecting_pairs[,1],],
+  ARP_RDs[intersecting_pairs[,2],]
+)
+
+is_na <- joined_polygons %>% 
+  filter(is.na(FORESTNAME))
+
+joined_df <- as.data.frame(joined_polygons)
+
+joined_groups <- group_by(joined_df, PCU_ID) %>% 
+  summarise(reps = n()) %>% 
+  filter(reps == 2)
+
+unique_joined_polygons <- distinct(joined_polygons, PCU_ID, .keep_all = TRUE)
+joined2_df <- as.data.frame(unique_joined_polygons)
+
+
+
+# add attributes 
+ARP_PCUs_vect$FORESTNAME <- intersect_RDs$FORESTNAME 
+ARP_PCUs_vect$DISTRICTNA <- intersect_RDs$DISTRICTNA 
+
 ARP_PCU_df <- as.data.frame(ARP_PCUs_vect)
 
 ##
@@ -929,10 +941,17 @@ unique(DEM_ARP_EBs) # 20 unique values (EBs)
 ### write & read ----
 writeRaster(DEM_ARP_EBs, "DEM_ARP_EBs.tif") 
 DEM_ARP_EBs <- rast("DEM_ARP_EBs.tif")
+summary(DEM_ARP_EBs)
+plot(is.na(DEM_ARP_EBs))
 
 ### extract max ----
 extract_EB_max <- extract(DEM_ARP_EBs, ARP_PCUs_vect, fun=max)
 str(extract_EB_max)
+
+is_na <- extract_EB_max %>% 
+  filter(is.na(USGS_1_n41w106_20230314))
+
+
 # rename col
 extract_EB_max <- extract_EB_max %>% 
   rename(EB_max = USGS_1_n41w106_20230314)
