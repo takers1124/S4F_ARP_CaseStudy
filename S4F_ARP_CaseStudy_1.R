@@ -19,8 +19,7 @@ library(ggplot2) # for fancy plotting
 # (2) create AOI ----
 
 # the Area of Interest (AOI) for this case study is the Arapaho-Roosevelt National Forest (ARP)
-## ARP ----
-### load & process ----
+## load & process ----
 NF_CONUS_vect <- vect("S_USA.FSCommonNames.shp")
 
 plot(NF_CONUS_vect)
@@ -37,21 +36,10 @@ plot(ARP_vect)
 # project 
 ARP_vect <- project(ARP_vect,"EPSG:5070")
 
-### write & read ----
+## write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
 ARP_vect <- vect("ARP_vect.shp")
 
-## reference points ----
-# these are optional, and were created using the tidygeocoder package
-# we will add these 2 points as references for plotting, 
-  # they represent Fort Collins and Boulder
-
-### write & read ----
-CO_refs_vect <- vect("CO_refs_vect.shp")
-
-### viz ----
-plot(ARP_vect)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 
 # (3) pre-process data ----
@@ -80,14 +68,11 @@ plot(ARP_risk_score_rast)
 ### viz ----
 plot(ARP_risk_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### stats ----
 global(ARP_risk_score_rast, fun = "notNA") # 7776004 cells 
 sum(ARP_risk_score_rast[] >= 0, na.rm = TRUE) # 7776004 cells
-
-7776004*900 # = 6998403600 m^2
-6998403600/4046.86 # = 1729342 acres (the entire ARP)
+# this dataset covers 100% of the ARP - no filtering areas out for low risk 
 
 ### write & read file ----
 writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
@@ -142,23 +127,14 @@ ARP_slope_score_rast <- (1 - slope_norm)
 ### viz ----
 plot(ARP_slope_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 plot(is.na(ARP_slope_score_rast))
 
 ### stats ----
 global(ARP_slope_score_rast, fun = "notNA") # 7433981 cells 
-sum(ARP_slope_score_rast[] >= 0, na.rm = TRUE) # 7433981 cells
 
-7433981*900 # = 6690582900 m^2
-6690582900/4046.86 # = 1,653,278 acres (all areas < 24* slope)
-
-# entire ARP = 7776004 cells & 1729342 acres
+# entire ARP = 7776004 cells 
 (7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
-(1653278/1729342)*100 # 95.60156 %
-
-expanse(ARP_slope_score_rast, unit = "ha") # 565363.9 ha
-565363.9*2.47105381 # 1,397,045 acres
 
 ### write & read ----
 writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
@@ -215,25 +191,23 @@ road_norm <- road_filtered / 917.3261
 plot(road_norm)
 
 # calc inverse
-ARP_road_score_rast <- (1 - road_norm)
-plot(ARP_road_score_rast)
-plot(is.na(ARP_road_score_rast))
+ARP_road_inverse <- (1 - road_norm)
+plot(ARP_road_inverse)
+
+### crop ----
+# need to crop again bc the road distance buffer goes a bit outside of the ARP
+ARP_road_score_rast = crop(ARP_road_inverse, ARP_vect, mask = TRUE)
 
 ### viz ----
 plot(ARP_road_score_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
+plot(is.na(ARP_road_score_rast))
 
 ### stats ----
-global(ARP_road_score_rast, fun = "notNA") # 5850375 cells 
-sum(ARP_road_score_rast[] >= 0, na.rm = TRUE) # 5850375 cells
+global(ARP_road_score_rast, fun = "notNA") # 5213776 cells 
 
-5850375*900 # = 5265337500 m^2
-5265337500/4046.86 # = 1301092 acres (all areas < 0.57 miles from roads)
-
-# entire ARP = 7776004 cells & 1729342 acres
-(5850375/7776004)*100 # 75.23627 % remaining after 24 degree filter 
-(1301092/1729342)*100 # 75.23627 %
+# entire ARP = 7776004 cells 
+(5213776/7776004)*100 # 67.04955 % remaining  
 
 ### write & read ----
 writeRaster(ARP_road_score_rast, "ARP_road_score_rast.tif")
@@ -273,34 +247,23 @@ ARP_height_score_rast <- ifel(
 )
 
 ### stats ----
-# entire ARP = 7776004 cells & 1729342 acres
+# entire ARP = 7776004 cells
 
 # all veg area
-sum(EVH_ARP[] >= 100, na.rm = TRUE) # 7004697 cells
-
-7004697*900 # = 6304227300 m^2
-6304227300/4046.86 # = 1557807 acres (all veg type in ARP)
-(1557807/1729342)*100 # 90.08091 % of ARP is vegetated 
+global(EVH_ARP >= 100, fun = "sum", na.rm = TRUE) # 7004697 cells
+(7004697/7776004)*100 # 90.08093 % of ARP is vegetated 
 
 # all tree area
-sum(EVH_ARP[] >= 100 & EVH_ARP[] < 200, na.rm = TRUE) # 5324379 cells
-
-5324379*900 # = 4791941100 m^2
-4791941100/4046.86 # = 1184113 acres (all trees in ARP)
-(1184113/1729342)*100 # 68.47188 % of ARP has trees 
+global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cells
+(5324379/7776004)*100 # 68.47192 % of ARP has trees 
 
 # trees > 10 ft area
-sum(ARP_height_score_rast[] == 100, na.rm = TRUE) # 4933551 cells
-
-4933551*900 # = 4440195900 m^2
-4440195900/4046.86 # = 1097195 acres (all trees in ARP > 10 ft)
-(1097195/1729342)*100 # 63.44581 % of ARP has trees
-
+global(ARP_height_score_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
+(5219760/7776004)*100 # 67.12651 % of ARP has trees
 
 ### viz ----
 plot(ARP_height_score_rast, col = "forestgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
@@ -320,33 +283,25 @@ plot(QMD_ARP)
 
 # reclassify with ifel()
 ARP_diameter_score_rast <- ifel(
-  QMD_ARP >= 6, 50, NA 
+  QMD_ARP >= 5, 50, NA 
 )
-# if >= 6 inches, reclassify to 50
-# if < 6 inches, reclassify to NA
-
+# if >= 5 inches, reclassify to 50
+# if < 5 inches, reclassify to NA
 
 ### stats ----
-# entire ARP = 7776004 cells & 1729342 acres
+# entire ARP = 7776004 cells 
 # all areas with QMD values
-sum(QMD_ARP[] >= 0, na.rm = TRUE) # 5697616 cells 
-5697616*900 # 5127854400 meters squared
-5127854400/4046.86 # = 1267119 acres (all area with QMD values in ARP)
-(1267119/1729342)*100 # 73.27174 % of ARP has QMD values
+global(QMD_ARP, fun = "notNA") # 5697616 cells
+(5697616/7776004)*100 # 73.27174 % of ARP has QMD values
 
-# areas with QMD > 6 inches
-sum(ARP_diameter_score_rast[] == 50, na.rm = TRUE) # 3183744 cells
-
-3183744*900 # = 2865369600 m^2
-2865369600/4046.86 # = 708047.6 acres (all trees in ARP > 6 in QMD)
-(708047.6/1729342)*100 # 40.94318 % of ARP has trees > 6 in QMD
-
+# areas with QMD > 5 inches
+global(ARP_diameter_score_rast, fun = "notNA") # 4160703
+(4160703/7776004)*100 # 53.50696 % of ARP has trees > 5 in QMD
 
 ### viz ----
 # see classified values
 plot(ARP_diameter_score_rast, col = "darkgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ### write & read ----
 writeRaster(ARP_diameter_score_rast, "ARP_diameter_score_rast.tif")
@@ -400,23 +355,17 @@ combined_raster <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
 ## viz ----
 plot(combined_raster)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
-# the combined_raster extends a bit beyond the ARP boundary
-  # crop & mask again
-ARP_combined_rast <- crop(combined_raster, ARP_vect, mask = TRUE)
-
-plot(ARP_combined_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ## stats ----
+# entire ARP = 7776004 cells 
+
+### need to recalculate ----
+
 # want to know how many cells (and how much area) falls into each category
   # ca 0: all values not NA
 global(ARP_combined_rast, fun = "notNA") # 7,775,581 cells 
-7775581*900 # 6998022900 m^2
-6998022900/4046.86 # 1729248 acres (meet at least 1 of the priority factory)
-(1729248/1729342)*100 # 99.99456 % of ARP 
+(1729248/7776004)*100 # 99.99456 % of ARP 
 
 # cat 1: values 0-3
     # slope, road, and risk combined & continuous values
