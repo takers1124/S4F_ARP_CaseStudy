@@ -18,13 +18,15 @@ library(ggplot2) # for fancy plotting
 
 # (2) create AOI ----
 
+## ARP ----
 # the Area of Interest (AOI) for this case study is the Arapaho-Roosevelt National Forest (ARP)
-## load & process ----
+### load & process ----
 NF_CONUS_vect <- vect("S_USA.FSCommonNames.shp")
 
 plot(NF_CONUS_vect)
 
 # see unique names 
+names(NF_CONUS_vect)
 unique(NF_CONUS_vect$COMMONNAME)
 
 # select for just ARP 
@@ -36,10 +38,35 @@ plot(ARP_vect)
 # project 
 ARP_vect <- project(ARP_vect,"EPSG:5070")
 
-## write & read ----
+### write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
 ARP_vect <- vect("ARP_vect.shp")
 
+## SRME ----
+# Southern Rocky Mountain Ecoregion
+### load & process ----
+EPA_ecoregions <- vect("us_eco_l3.shp") # 1250 geoms
+
+# see unique names 
+names(EPA_ecoregions)
+unique(EPA_ecoregions$US_L3NAME)
+
+# select for just SRME
+SRME_s_rockies <- EPA_ecoregions %>% 
+  filter(US_L3NAME == "Southern Rockies")
+  # has 4 separate polygons
+
+# aggregate them together
+SRME_aggregated <- terra::aggregate(SRME_s_rockies)
+plot(SRME_aggregated)
+# has 1 geom & 0 attributes (they are lost after aggregate)
+
+# project 
+SRME_vect <- project(SRME_aggregated, "EPSG:5070")
+
+### write & read ----
+writeVector(SRME_vect, "SRME_vect.shp")
+SRME_vect <- vect("SRME_vect.shp")
 
 
 # (3) pre-process data ----
@@ -361,6 +388,7 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 # entire ARP = 7776004 cells 
 
 ### need to recalculate ----
+### need use expanse() ----
 
 # want to know how many cells (and how much area) falls into each category
   # ca 0: all values not NA
