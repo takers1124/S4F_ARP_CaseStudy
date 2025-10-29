@@ -11,13 +11,23 @@
 
 library(terra) # primary spatial data management package
 library(tidyterra) # dplyr-style data management for spatial data
+library(dplyr)
+library(ggplot2)
+
+## AOI ----
+# created in part 1
+ARP_vect <- vect("ARP_vect.shp")
+
+SRME_vect <- vest("")
 
 
 # (1) import clims ----
 # just using 1 climate variable and 2 time periods 
 
-normal_1961_1990_MCMT <- rast("climate_NA_normal_1961_1990_MCMT.tif")
-future_2041_2070_MCMT <- rast("climate_NA_8GCMs_ssp245_2041_2070_MCMT.tif")
+normal_1961_1990_MCMT <- rast("Normal_1961_1990_MCMT.tif")
+ssp2_2041_2070_MCMT <- rast("UKESM10LL_ssp245_2041_2070_MCMT.tif")
+ssp5_2041_2070_MCMT <- rast("UKESM10LL_ssp585_2041_2070_MCMT.tif")
+
 
 # crop, mask & project
 ## normal ----
