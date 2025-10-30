@@ -17,38 +17,88 @@ library(ggplot2)
 ## AOI ----
 # created in part 1
 ARP_vect <- vect("ARP_vect.shp")
-
-SRME_vect <- vest("")
+SRME_vect <- vect("SRME_vect.shp")
 
 
 # (1) import clims ----
-# just using 1 climate variable and 2 time periods 
+# just using 1 climate variable and 3 time periods 
 
-normal_1961_1990_MCMT <- rast("Normal_1961_1990_MCMT.tif")
+reference_1961_1990_MCMT <- rast("Normal_1961_1990_MCMT.tif")
 ssp2_2041_2070_MCMT <- rast("UKESM10LL_ssp245_2041_2070_MCMT.tif")
 ssp5_2041_2070_MCMT <- rast("UKESM10LL_ssp585_2041_2070_MCMT.tif")
 
 
-# crop, mask & project
-## normal ----
-normal_projected <- project(normal_1961_1990_MCMT, EVH_CO)
-normal_ARP_rast <- crop(normal_projected, ARP, mask = TRUE)
-plot(normal_ARP_rast) # range -13:-1
-names(normal_ARP_rast) <- "norm_MCMT"
+# project, crop, & mask 
+## reference ----
+ref_projected <- project(reference_1961_1990_MCMT, "EPSG:5070")
+
+# ARP
+ref_ARP_rast <- crop(ref_projected, ARP_vect, mask = TRUE)
+summary(ref_ARP_rast)  # min: -12.839, max: -1.303, mean: -7.612     
+plot(ref_ARP_rast)  
+names(ref_ARP_rast) <- "ref_MCMT"
+
+# SRME 
+ref_SRME_rast <- crop(ref_projected, SRME_vect, mask = TRUE)
+summary(ref_SRME_rast)  # min: -13.878, max: -0.163, mean: -6.608  
+plot(ref_SRME_rast) 
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+names(ref_SRME_rast) <- "ref_MCMT"
 
 ### write & read 
-writeRaster(normal_ARP_rast, "normal_ARP_rast.tif")
-normal_ARP_rast <- rast("normal_ARP_rast.tif")
+writeRaster(ref_ARP_rast, "ref_ARP_rast.tif")
+ref_ARP_rast <- rast("ref_ARP_rast.tif")
 
-## future ----
-future_projected <- project(future_2041_2070_MCMT, EVH_CO) # took ~ 4 mins
-future_ARP_rast <- crop(future_projected, ARP, mask = TRUE)
-plot(future_ARP_rast) # range -9:1
-names(future_ARP_rast) <- "fut_MCMT"
+writeRaster(ref_SRME_rast, "ref_SRME_rast.tif")
+ref_SRME_rast <- rast("ref_SRME_rast.tif")
+
+
+## ssp2 ----
+ssp2_projected <- project(ssp2_2041_2070_MCMT, "EPSG:5070") # took ~ 4 mins
+
+# ARP
+ssp2_ARP_rast <- crop(ssp2_projected, ARP_vect, mask = TRUE)
+summary(ssp2_ARP_rast)  # min: -8.2840, max: 3.3150, mean: -3.0287     
+plot(ssp2_ARP_rast)  
+names(ssp2_ARP_rast) <- "ssp2_MCMT"
+
+# SRME
+ssp2_SRME_rast <- crop(ssp2_projected, SRME_vect, mask = TRUE)
+summary(ssp2_SRME_rast) # min: -9.078, max: 5.480, mean: -1.630
+plot(ssp2_SRME_rast)    
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+names(ssp2_SRME_rast) <- "ssp2_MCMT"
 
 ### write & read 
-writeRaster(future_ARP_rast, "future_ARP_rast.tif")
-future_ARP_rast <- rast("future_ARP_rast.tif")
+writeRaster(ssp2_ARP_rast, "ssp2_ARP_rast.tif")
+ssp2_ARP_rast <- rast("ssp2_ARP_rast.tif")
+
+writeRaster(ssp2_SRME_rast, "ssp2_SRME_rast.tif")
+ssp2_SRME_rast <- rast("ssp2_SRME_rast.tif")
+
+
+## ssp5 ----
+ssp5_projected <- project(ssp5_2041_2070_MCMT, "EPSG:5070") # took ~ 4 mins
+
+# ARP
+ssp5_ARP_rast <- crop(ssp5_projected, ARP_vect, mask = TRUE)
+summary(ssp5_ARP_rast)  # min: -7.0859, max: 4.5150, mean: -1.8743   
+plot(ssp5_ARP_rast)  
+names(ssp5_ARP_rast) <- "ssp2_MCMT"
+
+# SRME
+ssp5_SRME_rast <- crop(ssp5_projected, SRME_vect, mask = TRUE)
+summary(ssp5_SRME_rast)  # min: -8.078, max: 6.868, mean: -0.363 
+plot(ssp5_SRME_rast)  
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+names(ssp5_SRME_rast) <- "ssp2_MCMT"
+
+### write & read 
+writeRaster(ssp5_ARP_rast, "ssp5_ARP_rast.tif")
+ssp5_ARP_rast <- rast("ssp5_ARP_rast.tif")
+
+writeRaster(ssp5_SRME_rast, "ssp5_SRME_rast.tif")
+ssp5_SRME_rast <- rast("ssp5_SRME_rast.tif")
 
 
 
@@ -102,6 +152,7 @@ extract_clims <- function(zones, clim_rast) {
 
 PCU_norm_MCMT_df <- extract_clims(CL_PCUs, normal_ARP_rast)
 str(PCU_norm_MCMT_df) # has all the original attributes + new extracted climate metrics
+
 
 ### REV ----
 # using the FACTS needs polys from within the Cameron Peak fire boundary
