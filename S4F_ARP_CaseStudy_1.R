@@ -900,41 +900,42 @@ ARP_PCUs_vect$seed_zone <- extract_SZ$ZONE_NO
 # using ARP_DEM created in part 3.b
 ARP_DEM <- rast("ARP_DEM.tif")
 
-
 ### classify EB ----
 # the DEM is in meters, but we want 500ft EBs
 # convert m to ft
 meters_to_feet_factor <- 3.28084
-DEM_ARP_ft <- DEM_ARP * meters_to_feet_factor # min = 4970.553 , max = 14250.245 
+ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
+summary(ARP_DEM_ft) # min = 4839, max = 14227 
 
 # create a matrix 
 elev.matrix <- matrix(c(seq(4000, 14000, 500), seq(4500, 14500, 500), seq(4500, 14500, 500)), ncol=3, byrow = FALSE)
+  # becomes the top of the interval (max of range)
 
 # classify the DEM
-DEM_ARP_EBs <- classify(DEM_ARP_ft, rcl=elev.matrix, right=TRUE) # right = T ensures upper bound of interval included in band 
-plot(DEM_ARP_EBs)
-unique(DEM_ARP_EBs) # 20 unique values (EBs)
+ARP_DEM_EB_rast <- classify(ARP_DEM_ft, rcl=elev.matrix, right=TRUE) # right = T ensures upper bound of interval included in band 
+plot(ARP_DEM_EB_rast, type = "classes")
+unique(ARP_DEM_EB_rast) # 20 unique values (EBs)
 
 ### write & read ----
-writeRaster(DEM_ARP_EBs, "DEM_ARP_EBs.tif") 
-DEM_ARP_EBs <- rast("DEM_ARP_EBs.tif")
-summary(DEM_ARP_EBs)
-plot(is.na(DEM_ARP_EBs))
+writeRaster(ARP_DEM_EB_rast, "ARP_DEM_EB_rast.tif") 
+ARP_DEM_EB_rast <- rast("ARP_DEM_EB_rast.tif")
+
+summary(ARP_DEM_EB_rast)
+plot(is.na(ARP_DEM_EB_rast))
 
 ### extract max ----
-extract_EB_max <- extract(DEM_ARP_EBs, ARP_PCUs_vect, fun=max)
+extract_EB_max <- extract(ARP_DEM_EB_rast, ARP_PCUs_vect, fun=max)
 str(extract_EB_max)
 
 is_na <- extract_EB_max %>% 
   filter(is.na(USGS_1_n41w106_20230314))
-
 
 # rename col
 extract_EB_max <- extract_EB_max %>% 
   rename(EB_max = USGS_1_n41w106_20230314)
 
 ### extract min ----
-extract_EB_min <- extract(DEM_ARP_EBs, ARP_PCUs_vect, fun=min)
+extract_EB_min <- extract(ARP_DEM_EB_rast, ARP_PCUs_vect, fun=min)
 str(extract_EB_min)
 # rename col
 extract_EB_min <- extract_EB_min %>% 
@@ -1164,14 +1165,131 @@ ARP_PCUs_atts_vect <- vect("ARP_PCUs_atts_vect.shp")
 
 
 
-# (6) make maps ----
-# here we would use ggplot2 to make fancy maps and/or export to Arc
+# (6) make PPUs ----
+# we create potential planting units (PPUs)
+  # using the FACTS needs polys from within the Cameron Peak fire boundary
+    # last downloaded on August 3rd, 2025
+  # we divided the FACTS needs into small (50-200 acre) polygons
+  # then assigned a 500 ft elevation band (EB) to each
+  # and we are just using the 8500-9000 ft EB for this part of the case study
+# we will extract the future clim from these needs in Part 2
+
+## import ----
+needs_all <- vect("S_USA.Actv_SilvReforest_Needs.shp")
+names(needs_all)
+
+## filter ----
+desired_cols <- c("REGION_COD", "ADMIN_FORE", "DISTRICT_C", "FACTS_ID", "ACTIVITY_C")
+desired_ids <- c("RA20CPPLNT")
+  # for our case study, we just want this single polygon with FACTS_ID = RA20CPPLNT
+
+CL_sample_need_poly <- needs_all %>%
+  select(all_of(desired_cols)) %>% 
+  filter(FACTS_ID %in% desired_ids) 
+
+plot(CL_sample_need_poly)
+
+## project ---- 
+CL_sample_need_poly <- project(CL_sample_need_poly, "EPSG:5070")
+
+## divide ----
+# calc area 
+CL_sample_need_poly$area_all <- expanse(CL_sample_need_poly) * 0.000247105
+summary(CL_sample_need_poly$area_all) # 49637 acres
+
+### try 1 ----
+# calc number of parts
+  # want PPUs to be between 20-200 acres
+  # use the mid point of that range to "normalize" the total area
+(200-20)/2 # 90
+num_parts <- round(CL_sample_need_poly$area_all / 90) # 552
+
+set.seed(100)
+CL_needs <- divide(CL_sample_need_poly, n = num_parts)
+
+CL_needs$area_acres <- expanse(CL_needs) * 0.000247105
+summary(CL_needs$area_acres)
+  # min = 3.826, max = 562.624
+  # this is outside of what I would prefer for the range
+
+
+### try 2 ----
+# use a much smaller number ()
+set.seed(100)
+CL_needs2 <- divide(CL_sample_need_poly, n = 300)
+
+CL_needs2$area_acres <- expanse(CL_needs2) * 0.000247105
+summary(CL_needs2$area_acres)
+# min = 2.009 , max = 562.586 
+
+### try 3 ----
+# use a much larger number
+set.seed(100)
+CL_needs3 <- divide(CL_sample_need_poly, n = 750)
+
+CL_needs3$area_acres <- expanse(CL_needs3) * 0.000247105
+summary(CL_needs3$area_acres)
+# min = 7.856  , max = 171.197 
+
+### try 4 ----
+# use a much larger number
+set.seed(100)
+CL_needs4 <- divide(CL_sample_need_poly, n = 850)
+
+CL_needs4$area_acres <- expanse(CL_needs4) * 0.000247105
+summary(CL_needs4$area_acres)
+# min = 1.396    , max = 224.117 
 
 
 
+## add EBs ----
+# using the EBs created in part 1-6.c
+  # the ARP_DEM_vect was created in part 1-3.b
+ARP_DEM_EB_rast <- rast("ARP_DEM_EB_rast.tif")
+
+# extract max
+extract_EB <- extract(ARP_DEM_EB_rast, ARP_hottest_polys, fun=max)
+str(extract_EB)
+# rename col
+extract_EB <- extract_EB %>% 
+  rename(EB_500ft = USGS_1_n41w106_20230314)
+
+# extract min
+extract_EB_min <- extract(ARP_DEM_EB_rast, ARP_hottest_polys, fun=min)
+str(extract_EB_min)
+# rename col
+extract_EB_min <- extract_EB_min %>% 
+  rename(EB_min = USGS_1_n41w106_20230314)
 
 
 
+## divide code for PCUs
+
+## divide ----
+# calculate divisions needed, ensuring at least 2 parts for large polys
+num_parts <- pmax(2, round(large_polys$patch_acres / 125))
+
+# use lapply to iterate and divide
+divided_polys_list <- lapply(1:nrow(large_polys), function(i) {
+  poly <- large_polys[i, ]
+  
+  # set a seed to ensure reproducibility for the division process
+  set.seed(i)
+  
+  divided_poly <- divide(poly, n = num_parts[i])
+  
+  # store the original ID and re-calculate the new areas
+  divided_poly$patch_ID <- poly$patch_ID
+  divided_poly$div_acres <- expanse(divided_poly) * 0.000247105
+  
+  return(divided_poly)
+})
+
+# combine all divided polys into a single SpatVector
+divided_polys_vect <- do.call(rbind, divided_polys_list)
+
+# combine the small/mid-sized polys with the newly divided large polys
+ARP_PCUs_vect <- rbind(small_and_mid_polys, divided_polys_vect)
 
 
 
