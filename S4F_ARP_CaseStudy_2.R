@@ -21,9 +21,10 @@ SRME_vect <- vect("SRME_vect.shp")
 
 
 # (1) import clims ----
-# just using 1 climate variable and 3 time periods 
+# just using 1 climate variable and 4 time periods 
 
 reference_1961_1990_MCMT <- rast("Normal_1961_1990_MCMT.tif")
+current_1990_2020_MCMT <- 
 ssp2_2041_2070_MCMT <- rast("UKESM10LL_ssp245_2041_2070_MCMT.tif")
 ssp5_2041_2070_MCMT <- rast("UKESM10LL_ssp585_2041_2070_MCMT.tif")
 
