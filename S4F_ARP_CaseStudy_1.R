@@ -38,6 +38,12 @@ plot(ARP_vect)
 # project 
 ARP_vect <- project(ARP_vect,"EPSG:5070")
 
+# calc area
+expanse(ARP_vect) # 6975245280 m^2
+6975245280/4046.86 # 4046.86 m/acre = 1723619 acres
+
+expanse(ARP_vect, unit = "ha")
+
 ### write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
 ARP_vect <- vect("ARP_vect.shp")
@@ -106,6 +112,7 @@ writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
 ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
 
 
+
 ## (3.b) slope ----
 # this slope raster is generated using  
   # digital elevation model (DEM) tiles, downloaded from The National Map (USGS)
@@ -166,6 +173,8 @@ global(ARP_slope_score_rast, fun = "notNA") # 7433981 cells
 ### write & read ----
 writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
 ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
+
+
 
 ## (3.c) road ----
 
@@ -286,7 +295,7 @@ global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cell
 
 # trees > 10 ft area
 global(ARP_height_score_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
-(5219760/7776004)*100 # 67.12651 % of ARP has trees
+(5219760/7776004)*100 # 67.12651 % of ARP has trees > 10 ft
 
 ### viz ----
 plot(ARP_height_score_rast, col = "forestgreen")
@@ -386,87 +395,70 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 ## stats ----
 # entire ARP = 7776004 cells 
+# want to know how many cells (what % of ARP) falls into each category
 
-### need to recalculate ----
-### need use expanse() ----
-
-# want to know how many cells (and how much area) falls into each category
-  # ca 0: all values not NA
-global(ARP_combined_rast, fun = "notNA") # 7,775,581 cells 
-(1729248/7776004)*100 # 99.99456 % of ARP 
+# cat 0: all values not NA
+global(combined_raster, fun = "notNA") # 7778382 cells 
+(7778382/7776004)*100 # 100.0306 % of ARP 
+  # not sure why it is > 100%
 
 # cat 1: values 0-3
-    # slope, road, and risk combined & continuous values
-global(ARP_combined_rast >= 0 & ARP_combined_rast <= 3, fun = "sum", na.rm = TRUE) # 2469181 cells
-2469181*900 # 2222262900 m^2
-2222262900/4046.86 # 549132.6 acres (only meets slope, road, and/or risk)
-(549132.6/1729342)*100 # 31.75385 % of ARP 
+  # slope, road, and risk combined & continuous values
+  # but does not meet QMD or EVH threshold
+global(combined_raster >= 0 & combined_raster <= 3, fun = "sum", na.rm = TRUE) # 2141385 cells
+(2141385/7776004)*100 # 27.53837 % of ARP 
 
 # cat 2: values 50-53
   # just meet's QMD threshold
-global(ARP_combined_rast >= 50 & ARP_combined_rast <= 53, fun = "sum", na.rm = TRUE) # 372849 cells
-372849*900 # 335564100 m^2
-335564100/4046.86 # 82919.62 acres (QMD and cat 1)
-(82919.62/1729342)*100 # 4.794865 % of ARP 
+  # dense/wide but short (e.g. shelterwood, post-fire, krummholz, pinyon/limber)
+global(combined_raster >= 50 & combined_raster <= 53, fun = "sum", na.rm = TRUE) # 417237 cells
+(417237/7776004)*100 # 5.365699 % of ARP 
 
 # cat 3: values 100-103
   # just meet's EVH threshold
-global(ARP_combined_rast >= 100 & ARP_combined_rast <= 103, fun = "sum", na.rm = TRUE) # 2122656 cells
-2122656*900 # 1910390400 m^2
-1910390400/4046.86 # 472067.3 acres (EVH and cat 1)
-(472067.3/1729342)*100 # 27.29751 % of ARP 
+  # tall but not dense/wide (e.g. open-canopy lodgepole/pondo)
+global(combined_raster >= 100 & combined_raster <= 103, fun = "sum", na.rm = TRUE) # 1476294 cells
+(1476294/7776004)*100 # 18.98525 % of ARP 
 
 # cat 4: values 150-153
   # meet both QMD and EVH thresholds
-global(ARP_combined_rast >= 150 & ARP_combined_rast <= 153, fun = "sum", na.rm = TRUE) # 2810895 cells
-2810895*900 # 2529805500 m^2
-2529805500/4046.86 # 625128 acres (QMD & EVH & cat 1)
-(625128/1729342)*100 # 36.14832 % of ARP
+global(combined_raster >= 150 & combined_raster <= 153, fun = "sum", na.rm = TRUE) # 3743466 cells
+(3743466/7776004)*100 # 48.14126 % of ARP 
 
-31.75385+4.794865+27.29751+36.14832 # 99.99455 - it adds up! 
-
+27.53837+5.365699+18.98525+48.14126 # 100.0306 - it adds up! 
 
 ## filter & rescale ----
 # final values can be 0-3 for ease of interpretation 
 
 ARP_priority_rast <- ifel(
-  ARP_combined_rast >= 150 & ARP_combined_rast <= 153,
-  ARP_combined_rast - 150, NA
+  combined_raster >= 150 & combined_raster <= 153,
+  combined_raster - 150, NA
 ) %>% 
   rename(priority_s = sum)
 
 # just confirm filter
-global(ARP_priority_rast, fun = "notNA") # 2810895 cells (same as Cat 4 ^)
+global(ARP_priority_rast, fun = "notNA") # 3743466 cells (same as Cat 4 ^)
 
+## calc area ----
+  # transform = FALSE bc already an equal-area projection, EPSG: 5070, Conus Albers
+  # default units are m^2
+expanse(ARP_priority_rast, transform = FALSE) # 3369119400 m^2
+3369119400/4046.86 # 4046.86 m2/acre = 832526.8 acres
+  # entire ARP = 1723619 acres
+(832526.8/1723619)*100 # 48.30109 %
 
 ## viz ----
 plot(ARP_priority_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-points(CO_refs_vect, pch = 19, col = "purple", cex = 1.5)
 
 ## write & read ----
 writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
 ARP_priority_rast <- rast("ARP_priority_rast.tif")
 
 
-## stats V1 ----
-# see frequency of values
-freq(combined_rast)
-# value   count
-# 100   73573    - these cells score 0 for risk, slope, and road (min requirements met)
-# 101 1456051
-# 102 2032222
-# 103  199972    - these cells score high for risk, slope, and road (highest priority)
-
-# how large of an area is this?
-73573+1456051+2032222+199972 # = 3761818 cells with values (min requirements met)
-3761818*900 # = 3385636200 square meters
-3385636200/4046.86 # 4046.86 m/acre = 836608.2 acres
-(836608.2/1729342)*100 # 48.37726 % of ARP
-
 # note, all these areas meet our basic criteria (3.a - 3.d)
 # however, it is still too large of an area to scout
-# so, we must narrow it down further (part 1-5)
+# so, we must narrow it down further (part 1.5)
 
 
 
