@@ -19,12 +19,27 @@ library(ggplot2)
 ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
 
+## zones ----
+### FWD ----
+# these polygons are for existing seedlots (in nursery) or potential collection units (PCUs)
+  # use reference climate of collection unit
+  # match with future climate (where best to plant)
+
+### REV ----
+# these polygons are for existing planting needs (e.g. from FACTS) or potential planting units (PPUs)
+  # use future climate of planting unit
+  # match with reference climate (where best to collect)
+
+# for our case study, we chose only the planting needs (PPUs) within the Cameron Peak fire boundary
+  # and also only a subset of those planting needs which are in the 8500-9000 ft elevation band (EB)
+CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
+
 
 # (1) import clims ----
 # just using 1 climate variable and 4 time periods 
 
 reference_1961_1990_MCMT <- rast("Normal_1961_1990_MCMT.tif")
-current_1990_2020_MCMT <- 
+current_2011_2040_MCMT <- rast("UKESM10LL_ssp245_2011_2040_MCMT.tif")
 ssp2_2041_2070_MCMT <- rast("UKESM10LL_ssp245_2041_2070_MCMT.tif")
 ssp5_2041_2070_MCMT <- rast("UKESM10LL_ssp585_2041_2070_MCMT.tif")
 
@@ -53,6 +68,28 @@ ref_ARP_rast <- rast("ref_ARP_rast.tif")
 writeRaster(ref_SRME_rast, "ref_SRME_rast.tif")
 ref_SRME_rast <- rast("ref_SRME_rast.tif")
 
+## current ----
+current_projected <- project(current_2011_2040_MCMT, "EPSG:5070")
+
+# ARP
+curr_ARP_rast <- crop(current_projected, ARP_vect, mask = TRUE)
+summary(curr_ARP_rast)  # min: -10.5840, max: 0.8993  , mean: -5.3997       
+plot(curr_ARP_rast)  
+names(curr_ARP_rast) <- "curr_MCMT"
+
+# SRME 
+curr_SRME_rast <- crop(current_projected, SRME_vect, mask = TRUE)
+summary(curr_SRME_rast)  # min: -11.478, max: 2.461, mean: -4.307     
+plot(curr_SRME_rast) 
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+names(curr_SRME_rast) <- "curr_MCMT"
+
+### write & read 
+writeRaster(curr_ARP_rast, "curr_ARP_rast.tif")
+curr_ARP_rast <- rast("curr_ARP_rast.tif")
+
+writeRaster(curr_SRME_rast, "curr_SRME_rast.tif")
+curr_SRME_rast <- rast("curr_SRME_rast.tif")
 
 ## ssp2 ----
 ssp2_projected <- project(ssp2_2041_2070_MCMT, "EPSG:5070") # took ~ 4 mins
@@ -163,8 +200,37 @@ str(PCU_norm_MCMT_df) # has all the original attributes + new extracted climate 
 # we want to extract the future clim from these needs
 # we are calling them potential planting units (PPUs)
 
-PPU_fut_MCMT_df <- extract_clims(CL_PPUs_8500_9000, future_ARP_rast)
-str(PPU_fut_MCMT_df)
+#### ref ----
+  # if plant seed adapted to reference climate (collected between 1961-1990 from same zone)
+PPU_ref_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ref_ARP_rast)
+str(PPU_ref_MCMT_ARP_df)
+
+PPU_ref_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ref_SRME_rast)
+str(PPU_ref_MCMT_SRME_df)
+
+#### current ----
+  # if plant seed adapted to current climate (collected today from same zone)
+PPU_curr_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, curr_ARP_rast)
+str(PPU_curr_MCMT_ARP_df)
+
+PPU_curr_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, curr_SRME_rast)
+str(PPU_curr_MCMT_SRME_df)
+
+#### ssp2 ----
+  # if plant seed adapted to future ssp2 climate (collected today from different zone)
+PPU_ssp2_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ssp2_ARP_rast)
+str(PPU_ssp2_MCMT_ARP_df)
+
+PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
+str(PPU_ssp5_MCMT_SRME_df)
+
+#### ssp5 ----
+  # if plant seed adapted to future ssp5 climate (collected today from different zone)
+PPU_ssp5_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_ARP_rast)
+str(PPU_ssp5_MCMT_ARP_df)
+
+PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
+str(PPU_ssp5_MCMT_SRME_df)
 
 
 
@@ -175,17 +241,17 @@ match_clims <- function(zone_df, clim_rast) {
   # (1) pull in metrics from df created with extract_clims()
   z_median <- zone_df$zone_median
   
-  # (2) calc the difference (distance) between values from the clim_rast (each cell) and the zonal extract 
-  # then divide by 0.6 degrees C to normalize (incorporate variation)
+  # (2) calc the difference (distance) between climate metric from the clim_rast (each cell) and the zonal extract 
+    # then divide by 0.6 degrees C to normalize (incorporate variation)
   MCMT_diff <- abs(clim_rast - z_median)/0.6
   
   # (3) calc the match score
   m <- (-1 * (MCMT_diff - 1))*100
   
   # (4) adjust score
-  # make any score that would be <=0 match just be NA (filter terrible matches)
+    # make any score that would be <=0 match just be NA (filter terrible matches)
   m[m <= 0] <- NA
-  # and any match > 0 is just 1 (binary values, but can still add)
+    # and any match > 0 is just 1 (binary values, but can still add)
   m[m >0 ] <- 1
   set.names(m, "match")
   return(m)
