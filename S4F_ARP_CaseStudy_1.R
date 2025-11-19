@@ -1083,7 +1083,7 @@ str(EB_max_df)
 # rename col
 EB_max_df <- EB_max_df %>% 
   rename(PPU_ID = ID,
-         EM_max = USGS_1_n41w106_20230314)
+         EB_max = USGS_1_n41w106_20230314)
 
 # extract min
 EB_min_df <- extract(ARP_DEM_EB_rast, CL_PPUs_vect, fun=min)
@@ -1104,8 +1104,15 @@ writeVector(CL_PPUs_vect, "CL_PPUs_vect.shp")
 CL_PPUs_vect <- vect("CL_PPUs_vect.shp")
 
 ## select ----
-CL_PPU
+  # for the case study, we are only going to use the planting needs (PPUs)
+    # that are within the 8500 - 9000 ft EB
+CL_PPU_8500_9000_vect <- CL_PPUs_vect %>% 
+  filter(EB_min == 8500, EB_max == 9000)
+  # 13 geoms
 
+### write & read ----
+writeVector(CL_PPU_8500_9000_vect, "CL_PPU_8500_9000_vect.shp")
+CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
 
 
 
