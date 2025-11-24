@@ -205,32 +205,32 @@ str(PCU_norm_MCMT_df) # has all the original attributes + new extracted climate 
 PPU_ref_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ref_ARP_rast)
 str(PPU_ref_MCMT_ARP_df)
 
-PPU_ref_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ref_SRME_rast)
-str(PPU_ref_MCMT_SRME_df)
+# PPU_ref_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ref_SRME_rast)
+# str(PPU_ref_MCMT_SRME_df)
 
 #### current ----
   # if plant seed adapted to current climate (collected today from same zone)
 PPU_curr_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, curr_ARP_rast)
 str(PPU_curr_MCMT_ARP_df)
 
-PPU_curr_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, curr_SRME_rast)
-str(PPU_curr_MCMT_SRME_df)
+# PPU_curr_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, curr_SRME_rast)
+# str(PPU_curr_MCMT_SRME_df)
 
 #### ssp2 ----
   # if plant seed adapted to future ssp2 climate (collected today from different zone)
 PPU_ssp2_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ssp2_ARP_rast)
 str(PPU_ssp2_MCMT_ARP_df)
 
-PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
-str(PPU_ssp5_MCMT_SRME_df)
+# PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
+# str(PPU_ssp5_MCMT_SRME_df)
 
 #### ssp5 ----
   # if plant seed adapted to future ssp5 climate (collected today from different zone)
 PPU_ssp5_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_ARP_rast)
 str(PPU_ssp5_MCMT_ARP_df)
 
-PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
-str(PPU_ssp5_MCMT_SRME_df)
+# PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
+# str(PPU_ssp5_MCMT_SRME_df)
 
 
 
@@ -268,7 +268,7 @@ match_clims <- function(zone_df, clim_rast) {
 path <- getwd() # C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data")"
 
 output_name <- "test_results"
-results_dir <- paste0("results/",output_name)
+results_dir <- paste0("results/", output_name)
 
 
 for (row in 1:nrow(PPU_fut_MCMT_df)) {
@@ -285,9 +285,159 @@ for (row in 1:nrow(PPU_fut_MCMT_df)) {
   print(paste("Calculating match for each cell in clim_rast for zone # ", PPU_fut_MCMT_df[row, ]$PPU_id, " - ", round((row/nrow(PPU_fut_MCMT_df))*100, 2), "% complete", sep=""))
 }
 
-#### confirm ----
+# confirm
 
 PPU_180_fut_match_norm <- rast("PPU_180_fut_match_norm.tif")
 plot(PPU_180_fut_match_norm)
+
+
+
+### REV V2 ----
+
+#### ssp2 ARP ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_ARP_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_ssp2_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_ssp2_MCMT_ARP_df[row, ], ref_ARP_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_ssp2_MCMT_ARP_df[row, ]$PPU_ID, "_ssp2_match_ARP_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_ssp2_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+              round((row/nrow(PPU_ssp2_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+#### ssp2 SRME ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_SRME_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_ssp2_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_ssp2_MCMT_ARP_df[row, ], ref_SRME_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_ssp2_MCMT_ARP_df[row, ]$PPU_ID, "_ssp2_match_SRME_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_ssp2_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+               round((row/nrow(PPU_ssp2_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+#### ssp5 ARP ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_ARP_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_ssp5_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_ssp5_MCMT_ARP_df[row, ], ref_ARP_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_ssp5_MCMT_ARP_df[row, ]$PPU_ID, "_ssp5_match_ARP_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_ssp5_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+               round((row/nrow(PPU_ssp5_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+#### ssp5 SRME ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_SRME_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_ssp5_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_ssp5_MCMT_ARP_df[row, ], ref_SRME_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_ssp5_MCMT_ARP_df[row, ]$PPU_ID, "_ssp5_match_SRME_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_ssp5_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+               round((row/nrow(PPU_ssp5_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+#### curr ARP ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_ARP_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_curr_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_curr_MCMT_ARP_df[row, ], ref_ARP_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_curr_MCMT_ARP_df[row, ]$PPU_ID, "_curr_match_ARP_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_curr_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+               round((row/nrow(PPU_curr_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+#### curr SRME ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_SRME_ref"
+setwd(target_directory)
+
+for (row in 1:nrow(PPU_curr_MCMT_ARP_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PPU_curr_MCMT_ARP_df[row, ], ref_SRME_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PPU_", PPU_curr_MCMT_ARP_df[row, ]$PPU_ID, "_curr_match_SRME_ref.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PPU_curr_MCMT_ARP_df[row, ]$PPU_ID, " - ", 
+               round((row/nrow(PPU_curr_MCMT_ARP_df))*100, 2), "% complete"))
+}
+
+
 
 
