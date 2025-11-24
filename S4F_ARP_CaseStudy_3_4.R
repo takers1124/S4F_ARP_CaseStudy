@@ -76,7 +76,7 @@ plot(PPU_curr_match_sum_ARP_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-##### write & read ----
+###### write & read ----
 writeRaster(PPU_curr_match_sum_ARP_rast, "PPU_curr_match_sum_ARP_rast.tif")
 PPU_curr_match_sum_ARP_rast <- rast("PPU_curr_match_sum_ARP_rast.tif")
 
@@ -84,7 +84,7 @@ PPU_curr_match_sum_ARP_rast <- rast("PPU_curr_match_sum_ARP_rast.tif")
 ##### SRME ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_ARP_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_SRME_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -98,68 +98,213 @@ PPU_curr_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
 # so only 12 of the 13 PPUs in this EB have overlapping climate match areas
 
 plot(PPU_curr_match_sum_SRME_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
 polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
+
+###### write & read ----
+writeRaster(PPU_curr_match_sum_SRME_rast, "PPU_curr_match_sum_SRME_rast.tif")
+PPU_curr_match_sum_SRME_rast <- rast("PPU_curr_match_sum_SRME_rast.tif")
 
 #### ssp2 ----
 ##### ARP ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_ARP_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ssp2_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to 12,
+# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ssp2_match_sum_ARP_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
+
+###### write & read ----
+writeRaster(PPU_ssp2_match_sum_ARP_rast, "PPU_ssp2_match_sum_ARP_rast.tif")
+PPU_ssp2_match_sum_ARP_rast <- rast("PPU_ssp2_match_sum_ARP_rast.tif")
+
 
 ##### SRME ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_SRME_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ssp2_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to 12,
+# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ssp2_match_sum_SRME_rast)
+polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
+
+###### write & read ----
+writeRaster(PPU_ssp2_match_sum_SRME_rast, "PPU_ssp2_match_sum_SRME_rast.tif")
+PPU_ssp2_match_sum_SRME_rast <- rast("PPU_ssp2_match_sum_SRME_rast.tif")
 
 
 #### ssp5 ----
 ##### ARP ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_ARP_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ssp5_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to 12,
+# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ssp5_match_sum_ARP_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
+
+###### write & read ----
+writeRaster(PPU_ssp5_match_sum_ARP_rast, "PPU_ssp5_match_sum_ARP_rast.tif")
+PPU_ssp5_match_sum_ARP_rast <- rast("PPU_ssp5_match_sum_ARP_rast.tif")
+
 
 ##### SRME ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_SRME_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ssp5_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to 12,
+# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ssp5_match_sum_SRME_rast)
+polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
+
+###### write & read ----
+writeRaster(PPU_ssp5_match_sum_SRME_rast, "PPU_ssp5_match_sum_SRME_rast.tif")
+PPU_ssp5_match_sum_SRME_rast <- rast("PPU_ssp5_match_sum_SRME_rast.tif")
 
 
 
 ### overlay ----
+# now we want the PCU vector to have an attribute for each of the climate scenarios
+  # for now, I will just do the ARP clim match bc the PCU polys are only in the ARP
+ARP_all_PCUs_vect <- vect("ARP_all_PCUs_vect.shp")
+plot(ARP_all_PCUs_vect)
+
 #### curr ----
-##### ARP ----
 # extract "match value" for each PCU
-extract_match_mean_df <- extract(PPU_fut_match_sum_rast, ARP_PCUs_vect, fun = mean, na.rm = TRUE)
-str(extract_match_mean_df)
+match_curr_sum_df <- extract(PPU_curr_match_sum_ARP_rast, ARP_all_PCUs_vect, fun = mean, na.rm = TRUE)
+str(match_curr_sum_df)
 
 # rename, arrange, add rank
-extract_match_mean_df <- extract_match_mean_df %>% 
-  rename(match_mean = match,
-         PCU_ID = ID) %>% 
-  arrange(desc(match_mean)) %>%
-  mutate(match_rank = row_number())
-
-##### SRME ----
-
+match_curr_sum_df <- match_curr_sum_df %>% 
+  rename(match_curr = match,
+         PCU_ID = ID)
 
 #### ssp2 ----
-##### ARP ----
+# extract "match value" for each PCU
+match_ssp2_sum_df <- extract(PPU_ssp2_match_sum_ARP_rast, ARP_all_PCUs_vect, fun = mean, na.rm = TRUE)
+str(match_ssp2_sum_df)
 
-##### SRME ----
-
+# rename, arrange, add rank
+match_ssp2_sum_df <- match_ssp2_sum_df %>% 
+  rename(match_ssp2 = match,
+         PCU_ID = ID)
 
 #### ssp5 ----
-##### ARP ----
+# extract "match value" for each PCU
+match_ssp5_sum_df <- extract(PPU_ssp5_match_sum_ARP_rast, ARP_all_PCUs_vect, fun = mean, na.rm = TRUE)
+str(match_ssp5_sum_df)
 
-##### SRME ----
+# rename, arrange, add rank
+match_ssp5_sum_df <- match_ssp5_sum_df %>% 
+  rename(match_ssp5 = match,
+         PCU_ID = ID)
 
 
 ### merge ----
 # combine all 6 dfs
 
-# merge with spatvector
-ARP_PCUs_clim_matched_vect <- ARP_PCUs_vect %>% 
-  left_join(extract_match_mean_df, by = "PCU_ID")
-plot(ARP_PCUs_clim_matched_vect)
+match_join_df <- match_curr_sum_df %>% 
+  left_join(match_ssp2_sum_df, by = "PCU_ID") %>% 
+  left_join(match_ssp5_sum_df, by = "PCU_ID")
 
+# merge with spatvector
+ARP_all_PCUs_vect <- ARP_all_PCUs_vect %>% 
+  left_join(match_join_df, by = "PCU_ID")
+
+
+### filter curr ----
 # filter only PCUs that are within climate-matched areas (have a match score >= 1)
-ARP_PCUs_clim_matched_vect <- ARP_PCUs_clim_matched_vect %>% 
-  filter(match_mean >= 1)
-# has 227 geoms
-plot(ARP_PCUs_clim_matched_vect)
+ARP_PCUs_curr_clim_matched_vect <- ARP_all_PCUs_vect %>% 
+  filter(match_curr >= 1)
+# has 1813 geoms
+(1813/6428)*100 # 28.20473 % of all the PCUs in the ARP are climate matched (under current climate) with at least 1 PPU
+
+plot(ARP_PCUs_curr_clim_matched_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
 #### write & read ----
-writeVector(ARP_PCUs_clim_matched_vect, "ARP_PCUs_clim_matched_vect.shp")
-ARP_PCUs_clim_matched_vect <- vect("ARP_PCUs_clim_matched_vect.shp")
+writeVector(ARP_PCUs_curr_clim_matched_vect, "ARP_PCUs_curr_clim_matched_vect.shp")
+ARP_PCUs_curr_clim_matched_vect <- vect("ARP_PCUs_curr_clim_matched_vect.shp")
+
+
+### filter ssp2 ----
+# filter only PCUs that are within climate-matched areas (have a match score >= 1)
+ARP_PCUs_ssp2_clim_matched_vect <- ARP_all_PCUs_vect %>% 
+  filter(match_ssp2 >= 1)
+# has 307 geoms
+(307/6428)*100 # 4.77598 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 1 PPU
+
+plot(ARP_PCUs_ssp2_clim_matched_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01)
+
+#### write & read ----
+writeVector(ARP_PCUs_ssp2_clim_matched_vect, "ARP_PCUs_ssp2_clim_matched_vect.shp")
+ARP_PCUs_ssp2_clim_matched_vect <- vect("ARP_PCUs_ssp2_clim_matched_vect.shp")
+
+
+### filter ssp5 ----
+# filter only PCUs that are within climate-matched areas (have a match score >= 1)
+ARP_PCUs_ssp5_clim_matched_vect <- ARP_all_PCUs_vect %>% 
+  filter(match_ssp5 >= 1)
+# has 28 geoms
+(28/6428)*100 # 0.4355943 % of all the PCUs in the ARP are climate matched (under ssp5) with at least 1 PPU
+
+plot(ARP_PCUs_ssp5_clim_matched_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01)
+
+#### write & read ----
+writeVector(ARP_PCUs_ssp5_clim_matched_vect, "ARP_PCUs_ssp5_clim_matched_vect.shp")
+ARP_PCUs_ssp5_clim_matched_vect <- vect("ARP_PCUs_ssp5_clim_matched_vect.shp")
+
+
 
 
 
