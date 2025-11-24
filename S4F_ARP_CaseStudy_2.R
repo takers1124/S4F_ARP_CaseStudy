@@ -438,6 +438,7 @@ for (row in 1:nrow(PPU_curr_MCMT_ARP_df)) {
                round((row/nrow(PPU_curr_MCMT_ARP_df))*100, 2), "% complete"))
 }
 
-
+ex_rast <- rast("PPU_96_curr_match_SRME_ref.tif")
+plot(ex_rast)
 
 
