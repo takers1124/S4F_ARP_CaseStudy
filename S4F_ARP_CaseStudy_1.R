@@ -464,7 +464,7 @@ ARP_priority_rast <- rast("ARP_priority_rast.tif")
 
 
 
-# (5) make PCUs ----
+# (5-A) make PCUs ----
 
 # we need feasible (small) units to send the scouting crew
 # so we will filter the data and make "patches" of high-scoring areas
@@ -587,7 +587,7 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
 ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 
-# (5) make PCUs (no filter) ----
+# (5-B) make PCUs (no filter) ----
 ## patches ----
 # btw this line took 35 minutes to run
 
