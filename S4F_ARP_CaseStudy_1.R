@@ -1103,6 +1103,8 @@ CL_PPUs_vect <- CL_PPUs_vect %>%
 writeVector(CL_PPUs_vect, "CL_PPUs_vect.shp")
 CL_PPUs_vect <- vect("CL_PPUs_vect.shp")
 
+CL_PPUs_df <- as.data.frame(CL_PPUs_vect)
+
 ## select ----
   # for the case study, we are only going to use the planting needs (PPUs)
     # that are within the 8500 - 9000 ft EB
@@ -1114,6 +1116,15 @@ CL_PPU_8500_9000_vect <- CL_PPUs_vect %>%
 writeVector(CL_PPU_8500_9000_vect, "CL_PPU_8500_9000_vect.shp")
 CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
 
+
+# that are within the 9000 - 9500 ft EB
+CL_PPU_9000_9500_vect <- CL_PPUs_vect %>% 
+  filter(EB_min == 9000, EB_max == 9500)
+# 20 geoms
+
+### write & read ----
+writeVector(CL_PPU_9000_9500_vect, "CL_PPU_9000_9500_vect.shp")
+CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
 
 
 
