@@ -33,6 +33,8 @@ SRME_vect <- vect("SRME_vect.shp")
 # for our case study, we chose only the planting needs (PPUs) within the Cameron Peak fire boundary
   # and also only a subset of those planting needs which are in the 8500-9000 ft elevation band (EB)
 CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
+  # or, 9000-9500 ft EB
+CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
 
 
 # (1) import clims ----
@@ -221,6 +223,10 @@ str(PPU_curr_MCMT_ARP_df)
 PPU_ssp2_MCMT_ARP_df <- extract_clims(CL_PPU_8500_9000_vect, ssp2_ARP_rast)
 str(PPU_ssp2_MCMT_ARP_df)
 
+PPU_ssp2_MCMT_ARP_df <- extract_clims(CL_PPU_9000_9500_vect, ssp2_ARP_rast)
+str(PPU_ssp2_MCMT_ARP_df)
+
+
 # PPU_ssp5_MCMT_SRME_df <- extract_clims(CL_PPU_8500_9000_vect, ssp5_SRME_rast)
 # str(PPU_ssp5_MCMT_SRME_df)
 
@@ -297,7 +303,7 @@ plot(PPU_180_fut_match_norm)
 #### ssp2 ARP ----
 # set path to results directory to save output files to
 
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_ARP_ref"
 setwd(target_directory)
 
 for (row in 1:nrow(PPU_ssp2_MCMT_ARP_df)) {
@@ -321,7 +327,7 @@ for (row in 1:nrow(PPU_ssp2_MCMT_ARP_df)) {
 #### ssp2 SRME ----
 # set path to results directory to save output files to
 
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_SRME_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_SRME_ref"
 setwd(target_directory)
 
 for (row in 1:nrow(PPU_ssp2_MCMT_ARP_df)) {
