@@ -1126,6 +1126,7 @@ CL_PPU_9000_9500_vect <- CL_PPUs_vect %>%
 writeVector(CL_PPU_9000_9500_vect, "CL_PPU_9000_9500_vect.shp")
 CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
 
+sum(CL_PPU_9000_9500_vect$area_acres) # 3673.813 acres
 
 
 
