@@ -1,13 +1,11 @@
 # desctiption ----
 
 # Seeds 4 the Future ARP Case Study, the full script
-# parts 3 & 4, prioritize PCUs with...
-  # 3 = overlay climate match of PPUs with PCUs
-  # 4 = overlay PCUs with nursery inventory
+# parts 3 prioritize PCUs by overlaying climate match of PPUs with PCUs
 
 # this script was created by Taylor Akers (ORISE fellow with USFS, RMRS), Fall-Winter 2025
 
-# see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project
+# see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project & earlier parts
 
 # setup ----
 
@@ -16,26 +14,82 @@ library(tidyterra) # dplyr-style data management for spatial data
 library(dplyr)
 
 
-# part 3 ----
+# FWD ----
 
-## FWD ----
 
-## REV ----
 
-### sum V2 ----
-# we want to combine the output of match_clims() function
+# REV ----
+
+## (1) sum V2 ----
+# we want to combine the output of match_clims() function (part 2)
   # we will do this by summing raster values for all clim match rasters for all PPUs in the case study
-    # we will do this for each of the climate scenarios (current, ssp2, and ssp5)
+    # we will do this for each of the climate scenarios (reference, current, ssp2, and ssp5)
       # and both AOI (the ARP and the SRME)
 
-# we will see what areas on the landscape would have the greatest overall match for needs areas (PPUs)
-  # for this part of the case study, only using PPUs in 8500-9000 ft EB
+# with this sum raster, we will see what areas on the landscape would have the greatest overall match for needs areas (PPUs)
+  # for this part 3 of the case study, we are only using PPUs in 9000-9500 ft EB
+    # as described in part 2
 
-#### curr ----
-##### ARP ----
+### ref ----
+#### ARP ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_ARP_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ref_match_ARP_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ref_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to x,
+# so only x of the 20 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ref_match_sum_ARP_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+
+##### write & read ----
+writeRaster(PPU_ref_match_sum_ARP_rast, "PPU_ref_match_sum_ARP_rast.tif")
+PPU_ref_match_sum_ARP_rast <- rast("PPU_ref_match_sum_ARP_rast.tif")
+
+##### stats ----
+  # we want to know what proportion of the whole AOI (and/or acres covered)
+    # has clim match for at least 1 PPU (and/or half of the PPUs)
+# repeat for other periods/scenarior and both AOIs
+
+
+#### SRME ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ref_match_SRME_ref"
+
+# create a list of raster files in folder 
+rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
+
+# create a spatraster collection
+rast_collection <- sds(rast_files)
+
+# sum rast values across all layers
+PPU_ref_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
+# values range from 1 to x,
+# so only x of the 20 PPUs in this EB have overlapping climate match areas
+
+plot(PPU_ref_match_sum_SRME_rast)
+polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
+
+##### write & read ----
+writeRaster(PPU_ref_match_sum_SRME_rast, "PPU_ref_match_sum_SRME_rast.tif")
+PPU_ref_match_sum_SRME_rast <- rast("PPU_ref_match_sum_SRME_rast.tif")
+
+
+
+### curr ----
+#### ARP ----
+# set path to folder with all match_clim() output rasters
+rast_folder <- getwd() 
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/curr_match_ARP_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -45,22 +99,21 @@ rast_collection <- sds(rast_files)
 
 # sum rast values across all layers
 PPU_curr_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
-# values range from 1 to 12,
-# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+# values range from 1 to 19,
+# so only 19 of the 20 PPUs in this EB have overlapping climate match areas
 
 plot(PPU_curr_match_sum_ARP_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_curr_match_sum_ARP_rast, "PPU_curr_match_sum_ARP_rast.tif")
 PPU_curr_match_sum_ARP_rast <- rast("PPU_curr_match_sum_ARP_rast.tif")
 
 
-##### SRME ----
+#### SRME ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/curr_match_SRME_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/curr_match_SRME_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -70,22 +123,23 @@ rast_collection <- sds(rast_files)
 
 # sum rast values across all layers
 PPU_curr_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
-# values range from 1 to 12,
-# so only 12 of the 13 PPUs in this EB have overlapping climate match areas
+# values range from 1 to 19,
+# so only 19 of the 20 PPUs in this EB have overlapping climate match areas
 
 plot(PPU_curr_match_sum_SRME_rast)
 polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_curr_match_sum_SRME_rast, "PPU_curr_match_sum_SRME_rast.tif")
 PPU_curr_match_sum_SRME_rast <- rast("PPU_curr_match_sum_SRME_rast.tif")
 
-#### ssp2 ----
-##### ARP ----
+
+
+### ssp2 ----
+#### ARP ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_ARP_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_ARP_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -102,17 +156,16 @@ PPU_ssp2_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
 
 plot(PPU_ssp2_match_sum_ARP_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_ssp2_match_sum_ARP_rast, "PPU_ssp2_match_sum_ARP_rast.tif")
 PPU_ssp2_match_sum_ARP_rast <- rast("PPU_ssp2_match_sum_ARP_rast.tif")
 
 
-##### SRME ----
+#### SRME ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp2_match_SRME_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_SRME_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -127,18 +180,18 @@ PPU_ssp2_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
 
 plot(PPU_ssp2_match_sum_SRME_rast)
 polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_ssp2_match_sum_SRME_rast, "PPU_ssp2_match_sum_SRME_rast.tif")
 PPU_ssp2_match_sum_SRME_rast <- rast("PPU_ssp2_match_sum_SRME_rast.tif")
 
 
-#### ssp5 ----
-##### ARP ----
+
+### ssp5 ----
+#### ARP ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_ARP_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp5_match_ARP_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -153,17 +206,16 @@ PPU_ssp5_match_sum_ARP_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
 
 plot(PPU_ssp5_match_sum_ARP_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_ssp5_match_sum_ARP_rast, "PPU_ssp5_match_sum_ARP_rast.tif")
 PPU_ssp5_match_sum_ARP_rast <- rast("PPU_ssp5_match_sum_ARP_rast.tif")
 
 
-##### SRME ----
+#### SRME ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
-# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_8500_9000/ssp5_match_SRME_ref"
+# "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp5_match_SRME_ref"
 
 # create a list of raster files in folder 
 rast_files <- list.files(path = rast_folder, pattern = "\\.tif$", full.names = TRUE)
@@ -178,13 +230,18 @@ PPU_ssp5_match_sum_SRME_rast <- app(rast_collection, fun = "sum", na.rm = TRUE)
 
 plot(PPU_ssp5_match_sum_SRME_rast)
 polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
-polys(CL_PPU_8500_9000_vect, col = "orange", alpha=0.01, lwd=0.1)
 
-###### write & read ----
+##### write & read ----
 writeRaster(PPU_ssp5_match_sum_SRME_rast, "PPU_ssp5_match_sum_SRME_rast.tif")
 PPU_ssp5_match_sum_SRME_rast <- rast("PPU_ssp5_match_sum_SRME_rast.tif")
 
-### sum V1 ----
+
+
+## (2) overlay ----
+
+
+
+## (1) sum V1 ----
 # set path to folder with all match_clim() output rasters
 rast_folder <- getwd() 
 # "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/results/test_results/CL_PPUs_8500_9000"
