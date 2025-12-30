@@ -25,6 +25,12 @@ SRME_vect <- vect("SRME_vect.shp")
   # use reference climate of collection unit
   # match with future climate (where best to plant)
 
+# the PCU closest to the Lady Moon trail head has PCU_ID = 212
+  # we will use this for our case study
+PCU_LM <- ARP_all_PCUs_vect %>% 
+  filter(PCU_ID == 212)
+
+
 ### REV ----
 # these polygons are for existing planting needs (e.g. from FACTS) or potential planting units (PPUs)
   # use future climate of planting unit
@@ -63,7 +69,7 @@ plot(ref_SRME_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 names(ref_SRME_rast) <- "ref_MCMT"
 
-### write & read 
+### write & read ----
 writeRaster(ref_ARP_rast, "ref_ARP_rast.tif")
 ref_ARP_rast <- rast("ref_ARP_rast.tif")
 
@@ -86,7 +92,7 @@ plot(curr_SRME_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 names(curr_SRME_rast) <- "curr_MCMT"
 
-### write & read 
+### write & read ----
 writeRaster(curr_ARP_rast, "curr_ARP_rast.tif")
 curr_ARP_rast <- rast("curr_ARP_rast.tif")
 
@@ -109,7 +115,7 @@ plot(ssp2_SRME_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 names(ssp2_SRME_rast) <- "ssp2_MCMT"
 
-### write & read 
+### write & read ----
 writeRaster(ssp2_ARP_rast, "ssp2_ARP_rast.tif")
 ssp2_ARP_rast <- rast("ssp2_ARP_rast.tif")
 
@@ -133,7 +139,7 @@ plot(ssp5_SRME_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 names(ssp5_SRME_rast) <- "ssp2_MCMT"
 
-### write & read 
+### write & read ----
 writeRaster(ssp5_ARP_rast, "ssp5_ARP_rast.tif")
 ssp5_ARP_rast <- rast("ssp5_ARP_rast.tif")
 
@@ -184,14 +190,13 @@ extract_clims <- function(zones, clim_rast) {
 ## run it ----
 
 ### FWD ----
-# using the polys from within the Canyon Lakes RD only
-  # these were created in part 1
-    # just Canyon Lakes was selected for this part of the case study
-# we want to extract the normal clim from these areas
-# we are calling them potential collection units (PCUs)
+# using the PCU_LM poly closest to Lady Moon trailhead
+  # this were created in part 1
 
-PCU_norm_MCMT_df <- extract_clims(CL_PCUs, normal_ARP_rast)
-str(PCU_norm_MCMT_df) # has all the original attributes + new extracted climate metrics
+#### ref ----
+# we only want to extract the ref clim from this PCU
+PCU_ref_MCMT_df <- extract_clims(PCU_LM, ref_ARP_rast)
+str(PCU_ref_MCMT_df) # has original PCU attributes + new extracted climate metrics
 
 
 ### REV ----
@@ -252,7 +257,53 @@ match_clims <- function(zone_df, clim_rast) {
 ## run it ----
 ### FWD ----
 
+#### ssp2 ARP ----
+# set path to results directory where you want output files to go
 
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PCU_LM"
+setwd(target_directory)
+
+for (row in 1:nrow(PCU_ref_MCMT_df)) {
+  # for each "zone" or PCU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PCU_ref_MCMT_df[row, ], ssp2_ARP_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PCU_", PCU_ref_MCMT_df[row, ]$PCU_ID, "_ref_match_ARP_ssp2.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PCU_ref_MCMT_df[row, ]$PCU_ID, " - ", 
+               round((row/nrow(PCU_ref_MCMT_df))*100, 2), "% complete"))
+}
+
+#### ssp2 SRME ----
+# set path to results directory to save output files to
+
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PCU_LM"
+setwd(target_directory)
+
+for (row in 1:nrow(PCU_ref_MCMT_df)) {
+  # for each "zone" or PPU (row in df)
+  
+  # match_clims(zone_df, clim_rast)
+  # calc match score for each cell in the clim_rast, based on the zonal metrics in zone_df
+  # produce a raster for each zone (row in df)
+  match_rast <- match_clims(PCU_ref_MCMT_df[row, ], ssp2_SRME_rast) 
+  
+  # create a new filename
+  file_name <- paste0("PCU_", PCU_ref_MCMT_df[row, ]$PCU_ID, "_ref_match_SRME_ssp2.tif")
+  
+  # writeRaster in the results directory
+  writeRaster(match_rast, file_name, overwrite=TRUE)
+  # print status update 
+  print(paste0("Calculating match for each cell in clim_rast for zone # ", PCU_ref_MCMT_df[row, ]$PCU_ID, " - ", 
+               round((row/nrow(PCU_ref_MCMT_df))*100, 2), "% complete"))
+}
 
 
 
