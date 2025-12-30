@@ -687,6 +687,14 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 writeVector(ARP_all_PCUs_vect, "ARP_all_PCUs_vect.shp")
 ARP_all_PCUs_vect <- vect("ARP_all_PCUs_vect.shp")
 
+## select Lady Moon ----
+  # this is the case study PCU that we will use for FWD climate matching in part 2
+  # the PCU closest to the Lady Moon trail head has PCU_ID = 212
+
+PCU_LM <- ARP_all_PCUs_vect %>% 
+  filter(PCU_ID == 212)
+plot(PCU_LM)
+
 
 # (6) add attributes ----
 # in this step, we add attributes (metadata) to our polygons
@@ -987,7 +995,11 @@ extract_PSME <- extract_PSME %>%
   rename(PSME_tons = Hosted_AGB_0202_2018_DOUGLAS_FIR_06012023172436)
 
 ##
-## (6.p) combine ----
+## (6.p) nursery ----
+### *need to do ----
+
+##
+## (6.q) combine ----
 ARP_PCUs_vect # has PCU_ID, area_acres, FORESTNAME, DISTRICTNA, seed_zone
 
 # attributes to add
