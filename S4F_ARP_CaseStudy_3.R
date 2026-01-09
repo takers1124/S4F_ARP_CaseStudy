@@ -276,10 +276,10 @@ plot(ARP_all_PCUs_vect)
 #### ref ----
 # extract max "match value" across match_rast raster layers for each PCU
 ref_match_df <- extract(PPU_ref_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
-str(ref_match_mean_df)
+str(ref_match_df)
 
 # add sum and PCU_ID; remove auto-gen ID from extract()
-ref_match_df <- ref_match_df %>% 
+ref_match_df2 <- ref_match_df %>% 
   mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE),
          PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
   select(-1)
@@ -289,7 +289,7 @@ ref_match_df <- ref_match_df %>%
 curr_match_df <- extract(PPU_curr_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
-curr_match_df <- curr_match_df %>% 
+curr_match_df2 <- curr_match_df %>% 
   mutate(curr_sum = rowSums(curr_match_df[,-1], na.rm = TRUE),
          PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
   select(-1)
@@ -299,7 +299,7 @@ curr_match_df <- curr_match_df %>%
 ssp2_match_df <- extract(PPU_ssp2_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
-ssp2_match_df <- ssp2_match_df %>% 
+ssp2_match_df2 <- ssp2_match_df %>% 
   mutate(ssp2_sum = rowSums(ssp2_match_df[,-1], na.rm = TRUE),
          PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
   select(-1)
@@ -309,7 +309,7 @@ ssp2_match_df <- ssp2_match_df %>%
 ssp5_match_df <- extract(PPU_ssp5_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
-ssp5_match_df <- ssp5_match_df %>% 
+ssp5_match_df2 <- ssp5_match_df %>% 
   mutate(ssp5_sum = rowSums(ssp5_match_df[,-1], na.rm = TRUE),
          PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
   select(-1)
@@ -318,14 +318,17 @@ ssp5_match_df <- ssp5_match_df %>%
 ### (b) merge ----
 # combine all 3 dfs
 
-match_join_df <- ref_match_df %>% 
-  left_join(curr_match_df, by = "PCU_ID") %>% 
-  left_join(ssp2_match_df, by = "PCU_ID") %>% 
-  left_join(ssp5_match_df, by = "PCU_ID")
+match_join_df <- ref_match_df2 %>% 
+  left_join(curr_match_df2, by = "PCU_ID") %>% 
+  left_join(ssp2_match_df2, by = "PCU_ID") %>% 
+  left_join(ssp5_match_df2, by = "PCU_ID")
 
 # merge with spatvector
 ARP_PCUs_matched_full_vect <- ARP_all_PCUs_vect %>% 
   left_join(match_join_df, by = "PCU_ID")
+
+ARP_PCUs_matched_full_df <- as.data.frame(ARP_PCUs_matched_full_vect)
+str(ARP_PCUs_matched_full_df)
 
 #### write & read ----
 writeVector(ARP_PCUs_matched_full_vect, "ARP_PCUs_matched_full_vect.shp")
@@ -334,6 +337,8 @@ ARP_PCUs_matched_full_vect <- vect("ARP_PCUs_matched_full_vect.shp")
 ### (c) select ----
 ARP_PCUs_matched_vect <- ARP_PCUs_matched_full_vect %>% 
   select(PCU_ID, area_acres, ref_sum, curr_sum, ssp2_sum, ssp5_sum)
+
+ARP_PCUs_matched_df <- as.data.frame(ARP_PCUs_matched_vect)
 
 #### write & read ----
 writeVector(ARP_PCUs_matched_vect, "ARP_PCUs_matched_vect.shp")
@@ -345,8 +350,8 @@ ARP_PCUs_matched_vect <- vect("ARP_PCUs_matched_vect.shp")
 
 #### ssp2, 1 match----
 # filter only PCUs that are within climate-matched areas (have a match score >= 1)
-PCUs_matched_1_ssp2_vect <- ARP_PCUs_matched_vect %>% 
-  filter(match_ssp2 >= 1)
+PCUs_matched_1_ssp2_vect <- ARP_PCUs_matched_vect %>%
+  filter(ssp2_sum >= 1)
 
 ##### stats ----
 # has 1679 geoms
@@ -354,7 +359,7 @@ PCUs_matched_1_ssp2_vect <- ARP_PCUs_matched_vect %>%
 
 sum(PCUs_matched_1_ssp2_vect$area_acres) # 186385.3 acres
 # ARP is 1723619 acres
-(186385.3/1723619)*100 # 10.8136 % of area of ARP 
+(186385.3/1723619)*100 # 10.8136 % of area of ARP
 
 plot(PCUs_matched_1_ssp2_vect)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
@@ -366,20 +371,20 @@ PCUs_matched_1_ssp2_vect <- vect("PCUs_matched_1_ssp2_vect.shp")
 
 #### ssp2, 10 matches ----
 # filter only PCUs that meet 1/2 of needs (have a match score >= 10)
-PCUs_matched_10_ssp2_vect <- ARP_PCUs_matched_vect %>% 
-  filter(match_ssp2 >= 10)
+PCUs_matched_10_ssp2_vect <- ARP_PCUs_matched_vect %>%
+  filter(ssp2_sum >= 10)
 
 ##### stats ----
-# has 346 geoms
-(346/6428)*100 # 5.382701 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 10 PPUs (half of the 9000-9500 EB case study)
+# has 441 geoms
+(441/6428)*100 # 6.86061 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 10 PPUs (half of the 9000-9500 EB case study)
 
-sum(PCUs_matched_10_ssp2_vect$area_acres) # 32673.64 acres
+sum(PCUs_matched_10_ssp2_vect$area_acres) # 42233.71 acres
   # ARP is 1723619 acres
-(32673.64/1723619)*100 # 1.895642 % of ARP area
+(42233.71/1723619)*100 # 2.450293 % of ARP area
 
 ##### write & read ----
-writeVector(PCUs_matched_10_ssp2_vect, "PCUs_matched_10_ssp2_vect.shp")
-PCUs_matched_10_ssp2_vect <- vect("PCUs_matched_10_ssp2_vect.shp")
+# writeVector(PCUs_matched_10_ssp2_vect, "PCUs_matched_10_ssp2_vect.shp")
+# PCUs_matched_10_ssp2_vect <- vect("PCUs_matched_10_ssp2_vect.shp")
 
 
 
@@ -393,13 +398,12 @@ PCUs_matched_10_ssp2_vect <- vect("PCUs_matched_10_ssp2_vect.shp")
 # we will use the same method as above (2) for PCU overlays
 
 # we will use the large AOI (which covers the whole SRME) bc seedlots are all over interior west
-  # and the 4 "match sum" rasters that we created in part 3_1 (sum) above
 
 # we will use the nursery lat/long data that we created in part 1_6.p (nursery attributes for PCUs)
 ### the P1_6.p code needs to be re-written ----
 
 # in paper fig., want to show (1) all SLs in SRME and (2) those matching (above)
-# but the SLs need to be points, bc the polys are so small, they don't show up on Arc when zoomed out to SRME
+  # but the SLs need to be points, bc the polys are so small, they don't show up on Arc when zoomed out to SRME
 
 ### (a) read SLs ----
 # for now, use the pts created in Hotspots_ARP_CS_P3_P4.R script
@@ -410,11 +414,12 @@ seed_pts_df <- as.data.frame(seed_pts_sv)
 
 # but want to filter for only those that are located within the SRME
 seed_within <- relate(seed_pts_sv, SRME_vect, relation = "within")
+  # add as attribute to the spatvector
 seed_pts_sv$within_SRME <- seed_within
 
 seed_SRME <- seed_pts_sv %>% 
   filter(within_SRME == "TRUE") %>% 
-  select(species, ID, Year, Balance) %>% 
+  select(ID, Lot, species, Year, Balance, name) %>% 
   rename(SL_ID = ID) # SL for seedlot
 # has 159 geoms 
 (159/1296)*100 # = 12.26852 % of seedlots are within the SRME
@@ -426,34 +431,35 @@ seed_SRME <- seed_pts_sv %>%
 ref_match_df <- extract(PPU_ref_match_SRME_rast, seed_SRME)
 str(ref_match_df)
 
-ref_match_df <- ref_match_df %>% 
-  mutate(ref_match = rowSums(ref_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
+ref_match_df2 <- ref_match_df %>% 
+  mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
         SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
   select(-1)
+str(ref_match_df2)
 
 #### curr ----
 curr_match_df <- extract(PPU_curr_match_SRME_rast, seed_SRME)
 
-curr_match_df <- curr_match_df %>% 
-  mutate(curr_match = rowSums(curr_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
+curr_match_df2 <- curr_match_df %>% 
+  mutate(curr_sum = rowSums(curr_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
          SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
   select(-1)
 
 #### ssp2 ----
 ssp2_match_df <- extract(PPU_ssp2_match_SRME_rast, seed_SRME)
 
-ssp2_match_df <- ssp2_match_df %>% 
-  mutate(ssp2_match = rowSums(ssp2_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
+ssp2_match_df2 <- ssp2_match_df %>% 
+  mutate(ssp2_sum = rowSums(ssp2_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
          SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
   select(-1)
 
 #### ssp5 ----
 # extract mean "match sum" for each PCU
-ssp5_match_df <- extract(PPU_ssp5_match_sum_SRME_rast, seed_SRME)
+ssp5_match_df <- extract(PPU_ssp5_match_SRME_rast, seed_SRME)
 
 # rename, arrange, add rank
-ssp5_match_mean_df <- ssp5_match_mean_df %>% 
-  mutate(ssp5_match = rowSums(ssp5_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
+ssp5_match_df2 <- ssp5_match_df %>% 
+  mutate(ssp5_sum = rowSums(ssp5_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
          SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
   select(-1)
 
@@ -461,37 +467,41 @@ ssp5_match_mean_df <- ssp5_match_mean_df %>%
 ### (b) merge ----
 # combine all 3 dfs
 
-match_join_df <- ref_match_df %>% 
-  left_join(curr_match_df, by = "SL_ID") %>% 
-  left_join(ssp2_match_df, by = "SL_ID") %>% 
-  left_join(ssp5_match_df, by = "SL_ID")
+match_join_df <- ref_match_df2 %>% 
+  left_join(curr_match_df2, by = "SL_ID") %>% 
+  left_join(ssp2_match_df2, by = "SL_ID") %>% 
+  left_join(ssp5_match_df2, by = "SL_ID")
 
 # merge with spatvector
-SLs_SRME_matched_vect <- seed_SRME %>% 
+SRME_SLs_matched_full_vect <- seed_SRME %>% 
   left_join(match_join_df, by = "SL_ID")
 
-seedlots_matched_df <- as.data.frame(SLs_SRME_matched_vect)
+seedlots_matched_full_df <- as.data.frame(SRME_SLs_matched_full_vect)
+str(seedlots_matched_full_df)
 
 ##### write & read ----
-writeVector(SLs_SRME_matched_vect, "SLs_SRME_matched_vect.shp")
-SLs_SRME_matched_vect <- vect("SLs_SRME_matched_vect.shp")
+writeVector(SRME_SLs_matched_full_vect, "SRME_SLs_matched_full_vect.shp")
+SRME_SLs_matched_full_vect <- vect("SRME_SLs_matched_full_vect.shp")
+
+### (c) select ----
+SRME_SLs_matched_vect <- SRME_SLs_matched_full_vect %>% 
+  select(SL_ID, Lot, species, Year, Balance, name, ref_sum, curr_sum, ssp2_sum, ssp5_sum)
+
+#### write & read ----
+writeVector(SRME_SLs_matched_vect, "SRME_SLs_matched_vect.shp")
+SRME_SLs_matched_vect <- vect("SRME_SLs_matched_vect.shp")
 
 
 ### (c) filter ----
 
 #### ssp2, 1 matches ----
 # filter only SLs that meet 1/2 of needs (have a match score >= 10)
-SLs_matched_1_ssp2_vect <- SLs_SRME_matched_vect %>% 
-  filter(match_ssp2 >= 1)
+SLs_matched_1_ssp2_vect <- SRME_SLs_matched_vect %>%
+  filter(ssp2_sum >= 1)
 
 ##### stats ----
-# has 8 geoms
-(8/158)*100 # 5.063291 % of all the SLs in the SRME are climate matched (under ssp2) with at least 10 PPUs (half of the 9000-9500 EB case study)
-  # however, 6 of 8 SLs represent PIPO
-    # 2 of 8 represent PIFL, but the total balance is only 3.4 (units?)
-  # so if you wanted to plant anything at the case study PPUs besides PIPO, need to collect new seed
-    # on the other hand, you could choose to only plant PIPO and you already have seed available
-      # but may also want to restrict transfer by x miles or EBs (discussion section)
+# has 30 geoms
+(30/158)*100 # 18.98734 % of all the SLs in the SRME are climate matched (under ssp2) with at least 1 PPUs (from the 9000-9500 EB case study)
 
 ##### write & read ----
 writeVector(SLs_matched_10_ssp2_vect, "SLs_matched_10_ssp2_vect.shp")
