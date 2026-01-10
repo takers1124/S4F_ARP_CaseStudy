@@ -1,10 +1,11 @@
-# desctiption ----
+# description ----
 
-# Seeds 4 the Future ARP Case Study, the full script
-# parts 3 prioritize PCUs by overlaying climate match of PPUs with PCUs
+# Seeds 4 the Future ARP Case Study
+
+# Part 3 prioritizes PCUs by overlaying them with the climate match area for our case study PPUs with
+  # and investigates whether nursery seedlots overlay with the climate match of PPUs
 
 # this script was created by Taylor Akers (ORISE fellow with USFS, RMRS), Fall-Winter 2025
-
 # see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project & earlier parts
 
 # setup ----
