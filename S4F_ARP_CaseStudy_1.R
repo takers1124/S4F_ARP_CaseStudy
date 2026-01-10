@@ -1,11 +1,10 @@
 # description ----
 
 # Seeds 4 the Future ARP Case Study, the full script
-# part 1, create Potential Collection Units (PCUs)
+  # part 1, create Potential Collection Units (PCUs)
 
 # this script was created by Taylor Akers (ORISE fellow with USFS, RMRS), Fall-Winter 2025
-
-# see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project
+  # see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project
   # as well as information about where to download raw data
 
 # (1) setup ----
