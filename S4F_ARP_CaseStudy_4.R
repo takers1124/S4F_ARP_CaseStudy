@@ -11,7 +11,9 @@
 library(terra) # primary spatial data management package
 library(tidyterra) # dplyr-style data management for spatial data
 library(dplyr)
+library(tidyverse)
 library(ggplot2)
+library(viridis)
 
 # data prep ----
 ## import ----
@@ -37,15 +39,18 @@ plot(is.na(PPU_curr_match_sum_ARP_rast))
   # already in EPSG: 5070 (no need to project)
 EVT_24CONUS_rast <- rast("LC24_EVT_250.tif")
 is.factor(EVT_24CONUS_rast) # TRUE
-EVT_24CONUS_df <- read.csv("LF24_EVT_250.csv")
+# EVT_24CONUS_df <- read.csv("LF24_EVT_250.csv")
 
 EVT_16CONUS_rast <- rast("LC16_EVT_200.tif")
 is.factor(EVT_16CONUS_rast) # TRUE
-EVT_16CONUS_df <- read.csv("LF16_EVT_200.csv")
+# EVT_16CONUS_df <- read.csv("LF16_EVT_200.csv")
 
 ## crop and mask ----
+# we want to know what the EVT is for the entire match area
+# first, going to convert the match_sum rasters to polygons to make masking easier
+# then crop & mask the EVT to that match_sum area
+
 ### EVT_ARP_curr ----
-# first, going to convert the match_sum rasters to polygons to make mask easier 
 curr_match_ARP_vect <- aggregate(as.polygons(PPU_curr_match_sum_ARP_rast))
 EVT_ARP_curr_rast <- crop(EVT_24CONUS_rast, curr_match_ARP_vect, mask = TRUE)
 plot(EVT_ARP_curr_rast)
@@ -115,15 +120,81 @@ EVT16_PPUs_df <- freq(EVT16_PPUs_rast) %>%
   select(Group, EVT_NAME, REL_PERCENT)
 
 
+## combine & plot ----
+EVT_combined_df <- bind_rows(EVT16_PPUs_df,
+                             EVT_ARP_curr_df,
+                             EVT_ARP_ssp2_df,
+                             EVT_SRME_curr_df,
+                             EVT_SRME_ssp2_df)
 
-  
-  
-## combine ----
-EVT_combined_df <- bind_rows(EVT16_PPUs_df)
+# pick top 10 EVTs for each group
+EVT_top10 <- EVT_combined_df %>% 
+  slice_head(, n= 10, by = Group)
 
+unique(EVT_top10$EVT_NAME) # 19 unique EVTs
+
+# try 1
+EVT_combined_stackbar <- 
+  ggplot(EVT_top10, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME, order = REL_PERCENT)) +
+  geom_col(position = "stack") + 
+  labs(x = NULL, y = "Relative Percent", fill = "EVT_NAME") +
+  theme_minimal()
+# EVT bars not in order
+  
+# try 2
+EVT_combined_stackbar <- 
+  ggplot(EVT_top10, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME, order = REL_PERCENT)) +
+  geom_col(position = position_stack(reverse = TRUE)) + # adjusted 
+  labs(x = NULL, y = "Relative Percent", fill = "EVT_NAME") +
+  theme_minimal()
+# some are in order, but not all...
+
+# try 3
+# adjust the df - same top-bottom ordering for every group, based on global trends
+evt_order <- EVT_top10 %>% 
+  group_by(EVT_NAME) %>% 
+  summarise(total = sum(REL_PERCENT, na.rm = TRUE), .groups = "drop") %>% 
+  arrange(total) %>% 
+  pull(EVT_NAME)
+  
+EVT_top10_2 <- EVT_top10 %>% 
+  mutate(EVT_NAME = factor(EVT_NAME, levels = evt_order))
+str(EVT_top10_2)
+str(EVT_top10)
 
 EVT_combined_stackbar <- 
-  ggplot(EVT_combined_df, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME)) +
-  geom_bar(stat = "identity") + 
+  ggplot(EVT_top10_2, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME)) +
+  geom_col(position = position_stack(reverse = TRUE), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_d(option = "B", direction = 1) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(x = NULL, y = "Percent", fill = "EVT") +
   theme_minimal()
+  # has the largest overall (global) EVT category on top for each bar and for the legend order
+  # still not exactly what we want, but good enough for now... 
+
+
+## add elevation rank ----
+# we want the evt legend to be ordered by elevation
+  # we will rank each EVT based on natural history data
+
+### (1) set evt ranks ----
+
+
+
+
+
+### (2) combine with EVT_top10 df ----
+
+
+### (3) define legend order ----
+
+
+### (4) plot anew ----
+  
+  
+
+  
+  
+  
+  
 
