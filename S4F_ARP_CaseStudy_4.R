@@ -8,8 +8,8 @@
 
 # setup ----
 
-library(terra) # primary spatial data management package
-library(tidyterra) # dplyr-style data management for spatial data
+library(terra) 
+library(tidyterra) 
 library(dplyr)
 library(tidyverse)
 library(ggplot2)
