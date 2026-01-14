@@ -12,7 +12,6 @@
 library(terra) 
 library(tidyterra) 
 library(dplyr)
-library(ggplot2) 
 
 # load spatial data
 ARP_vect <- vect("ARP_vect.shp")
@@ -183,7 +182,7 @@ seed_SRME_vect <- seed_poly_vect %>%
 (158/1296)*100 # = 12.19136 % of seedlot polys are within the SRME
 
 # simplify for relating
-seed_SRME_simp <- simplifyGeom(seed_SRME_vect, tolerance = 50) # 50 meters
+# seed_SRME_simp <- simplifyGeom(seed_SRME_vect, tolerance = 50) # 50 meters
 
 
 
@@ -199,21 +198,37 @@ seed_SRME_simp <- simplifyGeom(seed_SRME_vect, tolerance = 50) # 50 meters
   # and if they do overlap, the PCU will have the SL_ID added as an attribute for looking up later
 
 # compute spatial relationship
-SL_relate <- relate(ARP_all_PCUs_vect, seed_SRME_simp, relation = "intersects", pairs = TRUE)
-str(SL_relate) # a list with intersecting pairs
+SL_relate <- relate(ARP_all_PCUs_vect, seed_SRME_vect, relation = "intersects", pairs = TRUE, na.rm = TRUE)
+str(SL_relate) # a list of vectors (one per PCU) with intersecting pairs
 
-# make an empty list
-SL_list <- rep(NA_character_, nrow(ARP_all_PCUs_vect))
-# keep first match per PCU (some have >1 intersection)
-first_hit <- SL_relate[!duplicated(SL_relate[, 1]), ]
-# assign Lot values (may want to change attribute later)
-SL_list[first_hit[, 1]] <- seed_poly_vect$Lot[first_hit[, 2]]
-# attach attribute
-ARP_all_PCUs_vect$seedlot <- SL_list
+# adjust data
+rel_df <- as.data.frame(SL_relate)
+colnames(rel_df) <- c("pcu_idx", "seed_idx")
 
+# compute per-PCU hit order
+rel_df <- rel_df %>%
+  group_by(pcu_idx) %>%
+  mutate(hit = row_number()) %>%
+  ungroup()
 
+# slice the first and second hits
+first_hit  <- filter(rel_df, hit == 1)
+second_hit <- filter(rel_df, hit == 2)
+  # when expanding PCU creation to SRME, the # hits may be >2, so may need to adjust 
 
+# prepare attribute vectors
+SL_A <- rep(NA_character_, nrow(ARP_all_PCUs_vect))
+SL_B <- rep(NA_character_, nrow(ARP_all_PCUs_vect))
 
+# assign seedlot names by index
+SL_A[first_hit$pcu_idx]  <- seed_poly_vect$Lot[first_hit$seed_idx]
+SL_B[second_hit$pcu_idx] <- seed_poly_vect$Lot[second_hit$seed_idx]
+
+# attach attributes
+ARP_all_PCUs_vect$seedlot_A <- SL_A
+ARP_all_PCUs_vect$seedlot_B <- SL_B
+
+PCU_df <- as.data.frame(ARP_all_PCUs_vect)
 
 
 
