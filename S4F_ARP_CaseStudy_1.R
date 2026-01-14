@@ -89,6 +89,8 @@ CFP_50_40 <- rast("crown_fire_2025_c00050_r00040.tif")
 CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
 plot(CFP_mosaic)
 
+#### ** final change ----
+  # name this ARP_CFP_rast (replace "risk" with actual value "CFP)
 # crop and mask  
 ARP_risk_score_rast <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
 plot(ARP_risk_score_rast)
