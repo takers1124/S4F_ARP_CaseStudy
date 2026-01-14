@@ -400,28 +400,30 @@ sum(PCUs_matched_10_ssp2_vect$area_acres) # 42233.71 acres
 
 # we will use the large AOI (which covers the whole SRME) bc seedlots are all over interior west
 
-# we will use the nursery lat/long data that we created in part 1_6.p (nursery attributes for PCUs)
-### the P1_6.p code needs to be re-written ----
+# we will use the nursery lat/long data that we created in Part1_B (nursery attributes for PCUs)
 
 # in paper fig., want to show (1) all SLs in SRME and (2) those matching (above)
   # but the SLs need to be points, bc the polys are so small, they don't show up on Arc when zoomed out to SRME
 
+### ** check final ----
+  # I altered the file name and SL_ID col in Part 1_B
+  # make sure runs smoothly below with changes
+
 ### (a) read SLs ----
-# for now, use the pts created in Hotspots_ARP_CS_P3_P4.R script
-seed_pts_sv <- vect("seed_points_5070_sv.shp")
+# created in Part 1_B
+seed_points_vect <- vect("seed_points_vect.shp")
 # has 1296 geoms & 14 attributes
 
-seed_pts_df <- as.data.frame(seed_pts_sv)
+seed_pts_df <- as.data.frame(seed_points_vect)
 
 # but want to filter for only those that are located within the SRME
-seed_within <- relate(seed_pts_sv, SRME_vect, relation = "within")
+seed_within <- relate(seed_points_vect, SRME_vect, relation = "within")
   # add as attribute to the spatvector
-seed_pts_sv$within_SRME <- seed_within
+seed_points_vect$within_SRME <- seed_within
 
-seed_SRME <- seed_pts_sv %>% 
+seed_SRME <- seed_points_vect %>% 
   filter(within_SRME == "TRUE") %>% 
-  select(ID, Lot, species, Year, Balance, name) %>% 
-  rename(SL_ID = ID) # SL for seedlot
+  select(SL_ID, Lot, species, Year, Balance, name)
 # has 159 geoms 
 (159/1296)*100 # = 12.26852 % of seedlots are within the SRME
 # has one more than when use polys (probably the poly is on SRME boundary)
