@@ -94,7 +94,7 @@ EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
 meters_to_feet_factor <- 3.28084
 
 # reclassify with ifel()
-ARP_height_score_rast <- ifel(
+ARP_EVH_filt_rast <- ifel(
   # condition 1: it is dominant veg type trees? (values 100-199)
   EVH_ARP >= 100 & EVH_ARP < 200,
   # if TRUE, 
@@ -119,16 +119,16 @@ global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cell
 (5324379/7776004)*100 # 68.47192 % of ARP has trees 
 
 # trees > 10 ft area
-global(ARP_height_score_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
+global(ARP_EVH_filt_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
 (5219760/7776004)*100 # 67.12651 % of ARP has trees > 10 ft
 
 ### viz ----
-plot(ARP_height_score_rast, col = "forestgreen")
+plot(ARP_EVH_filt_rast, col = "forestgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 ### write & read ----
-writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
-ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
+writeRaster(ARP_EVH_filt_rast, "ARP_EVH_filt_rast.tif")
+ARP_EVH_filt_rast <- rast("ARP_EVH_filt_rast.tif")
 
 
 
@@ -143,7 +143,7 @@ QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
 plot(QMD_ARP)
 
 # reclassify with ifel()
-ARP_diameter_score_rast <- ifel(
+ARP_QMD_filt_rast <- ifel(
   QMD_ARP >= 5, 50, NA 
 )
 # if >= 5 inches, reclassify to 50
@@ -156,17 +156,17 @@ global(QMD_ARP, fun = "notNA") # 5697616 cells
 (5697616/7776004)*100 # 73.27174 % of ARP has QMD values
 
 # areas with QMD > 5 inches
-global(ARP_diameter_score_rast, fun = "notNA") # 4160703
+global(ARP_QMD_filt_rast, fun = "notNA") # 4160703
 (4160703/7776004)*100 # 53.50696 % of ARP has trees > 5 in QMD
 
 ### viz ----
 # see classified values
-plot(ARP_diameter_score_rast, col = "darkgreen")
+plot(ARP_QMD_filt_rast, col = "darkgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 ### write & read ----
-writeRaster(ARP_diameter_score_rast, "ARP_diameter_score_rast.tif")
-ARP_diameter_score_rast <- rast("ARP_diameter_score_rast.tif")
+writeRaster(ARP_QMD_filt_rast, "ARP_QMD_filt_rast.tif")
+ARP_QMD_filt_rast <- rast("ARP_QMD_filt_rast.tif")
 
 
 
@@ -206,35 +206,27 @@ minmax(ARP_slope)
   # and we want 0-24 degree slope to become 0-1 score (normalize)
 
 # make all values > 24 degrees NA, leave other values as-is
-slope_filtered <- ifel(ARP_slope > 24, NA, ARP_slope)
-plot(slope_filtered)
-
-# normalize scale
-slope_norm <- slope_filtered / 24
-plot(slope_norm)
-
-# calc inverse score
-ARP_slope_score_rast <- (1 - slope_norm)
+ARP_slope_filt_rast <- ifel(ARP_slope > 24, NA, ARP_slope)
 
 ### viz ----
-plot(ARP_slope_score_rast)
+plot(ARP_slope_filt_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 
-plot(is.na(ARP_slope_score_rast))
+plot(is.na(ARP_slope_filt_rast))
 
 ### stats ----
-global(ARP_slope_score_rast, fun = "notNA") # 7433981 cells 
+global(ARP_slope_filt_rast, fun = "notNA") # 7433981 cells 
 
 # entire ARP = 7776004 cells 
 (7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
 
 ### write & read ----
-writeRaster(ARP_slope_score_rast, "ARP_slope_score_rast.tif")
-ARP_slope_score_rast <- rast("ARP_slope_score_rast.tif")
+writeRaster(ARP_slope_filt_rast, "ARP_slope_filt_rast.tif")
+ARP_slope_filt_rast <- rast("ARP_slope_filt_rast.tif")
 
 
 
-## (3.c) road ----
+## road ----
 
 # import CO roads shapefile
   # downloaded from The National Map
@@ -270,6 +262,10 @@ ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine")
 plot(ARP_road_dist_rast)
 # cell values = distance to nearest road (in meters)
 
+### write & read file ----
+writeRaster(ARP_road_dist_rast, "ARP_road_dist_rast.tif")
+ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
+
 ### adjust values ----
 minmax(ARP_road_dist_rast) 
 # min = 0, max = 37416.17 
@@ -277,47 +273,34 @@ minmax(ARP_road_dist_rast)
   # and we want 0-917 m distance to become 0-1 score (normalize)
 
 # make NA all values > 917.3261 meters, leave other values as-is
-road_filtered <- ifel(ARP_road_dist_rast > 917.3261, NA, ARP_road_dist_rast)
+road_filt_rast <- ifel(ARP_road_dist_rast > 917.3261, NA, ARP_road_dist_rast)
 plot(road_filtered)
-
-# normalize scale
-road_norm <- road_filtered / 917.3261
-plot(road_norm)
-
-# calc inverse
-ARP_road_inverse <- (1 - road_norm)
-plot(ARP_road_inverse)
 
 ### crop ----
 # need to crop again bc the road distance buffer goes a bit outside of the ARP
-ARP_road_score_rast = crop(ARP_road_inverse, ARP_vect, mask = TRUE)
+ARP_road_filt_rast = crop(road_filt_rast, ARP_vect, mask = TRUE)
 
 ### viz ----
-plot(ARP_road_score_rast)
+plot(ARP_road_filt_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-plot(is.na(ARP_road_score_rast))
+plot(is.na(ARP_road_filt_rast))
 
 ### stats ----
-global(ARP_road_score_rast, fun = "notNA") # 5213776 cells 
+global(ARP_road_filt_rast, fun = "notNA") # 5213776 cells 
 
 # entire ARP = 7776004 cells 
 (5213776/7776004)*100 # 67.04955 % remaining  
 
 ### write & read ----
-writeRaster(ARP_road_score_rast, "ARP_road_score_rast.tif")
-ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
-
-
-
-
-
-
-
-
+writeRaster(ARP_road_filt_rast, "ARP_road_filt_rast.tif")
+ARP_road_filt_rast <- rast("ARP_road_filt_rast.tif")
 
 
 
 # (4) combine data ----
+## ** need to re-run ----
+  # may need to change resampling technique with new raster changes (above)
+
 
 ## resample ----
 # first, the rasters need to be resampled so their extents align,

@@ -384,11 +384,8 @@ extract_QMD <- extract_QMD %>%
 
 
 ### road ----
-# using ARP_road_rast from Part1_A_3c 
-ARP_road_rast <- rast("ARP_road_rast.tif") 
-
-# calculate the distance to nearest road for each raster cell (pixel)
-ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine") 
+# using ARP_road_dist_rast from Part1A_3 
+ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
 
 extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
 str(extract_road_dist)
