@@ -1,13 +1,13 @@
 # description ----
 
 # Seeds 4 the Future ARP Case Study
-  # part 1-B, add attributes to PCUs
+  # part 1B, add attributes to PCUs
 
 # this script was created by Taylor Akers (ORISE fellow with USFS, RMRS), Fall-Winter 2025
   # see ARP_CaseStudy_Overview_RMRS.pdf for a full description of the project
   # as well as information about where to download raw data
 
-# setup ----
+# (1) setup ----
 
 library(terra) 
 library(tidyterra) 
@@ -17,11 +17,44 @@ library(dplyr)
 ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
 
-# PCU SpatVector created in Part 1-A
-ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
+# PCU SpatVector created in Part 1A
+ARP_PCUs_1A_vect <- vect("ARP_PCUs_1A_vect.shp")
   # only has PCU_ID and area_acres as attributes
+  # this Part 1B script will add all the general attributes to it
 
-## nursery data integration ----
+
+## (A) risk data integration ----
+# using the crown fire probability (CFP) dataset from Pyrologix 
+
+### load & process ----
+CFP_49_41 <- rast("crown_fire_2025_c00049_r00041.tif")
+CFP_50_41 <- rast("crown_fire_2025_c00050_r00041.tif")
+CFP_50_40 <- rast("crown_fire_2025_c00050_r00040.tif")
+  # CRS already in 5070
+
+# combine
+CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
+plot(CFP_mosaic)
+  # the raster values are 0-1 (probability)
+
+# crop and mask  
+ARP_CFP_rast <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
+
+### viz ----
+plot(ARP_CFP_rast)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+
+### stats ----
+global(ARP_CFP_rast, fun = "notNA") # 7776004 cells 
+sum(ARP_CFP_rast[] >= 0, na.rm = TRUE) # 7776004 cells
+# this dataset covers 100% of the ARP  
+
+### write & read file ----
+writeRaster(ARP_CFP_rast, "ARP_CFP_rast.tif")
+ARP_CFP_rast <- rast("ARP_CFP_rast.tif")
+
+
+## (B) nursery data integration ----
 
 # goal is to see if any of these PCUs that we identified are already represented in the nursery inventory
   # nursery inventories are not standardized across the forest service
@@ -186,19 +219,23 @@ seed_SRME_vect <- seed_poly_vect %>%
 
 
 
-
-# add attributes ----
+# (2) attribute creation ----
 # in this step, we add attributes (metadata) to our PCU polygons
 # this is how we further filter & select PCUs for scouting
+# we will divide the attributes into 4 groups (A-D)
 
 
-##
-## (15) nursery ----
+## (A) attributes: geographic info ----
+# these attributes were not used to create PCUs
+# we are adding them to provide basic geographic information about each PCU for reference and filtering
+
+
+### nursery SL ----
 # we want to know if any of the nursery seedlots (SLs) overlap with our PCUs
   # and if they do overlap, the PCU will have the SL_ID added as an attribute for looking up later
 
 # compute spatial relationship
-SL_relate <- relate(ARP_PCUs_vect, seed_SRME_vect, relation = "intersects", pairs = TRUE, na.rm = TRUE)
+SL_relate <- relate(ARP_PCUs_1A_vect, seed_SRME_vect, relation = "intersects", pairs = TRUE, na.rm = TRUE)
 str(SL_relate) # a list of vectors (one per PCU) with intersecting pairs
 
 # adjust data
@@ -217,22 +254,19 @@ second_hit <- filter(rel_df, hit == 2)
   # when expanding PCU creation to SRME, the # hits may be >2, so may need to adjust 
 
 # prepare attribute vectors
-SL_A <- rep(NA_character_, nrow(ARP_PCUs_vect))
-SL_B <- rep(NA_character_, nrow(ARP_PCUs_vect))
+SL_A <- rep(NA_character_, nrow(ARP_PCUs_1A_vect))
+SL_B <- rep(NA_character_, nrow(ARP_PCUs_1A_vect))
 
 # assign seedlot names by index
 SL_A[first_hit$pcu_idx]  <- seed_poly_vect$Lot[first_hit$seed_idx]
 SL_B[second_hit$pcu_idx] <- seed_poly_vect$Lot[second_hit$seed_idx]
 
 # attach attributes
-ARP_PCUs_vect$seedlot_A <- SL_A
-ARP_PCUs_vect$seedlot_B <- SL_B
-
-PCU_df <- as.data.frame(ARP_PCUs_vect)
+ARP_PCUs_1A_vect$seedlot_A <- SL_A
+ARP_PCUs_1A_vect$seedlot_B <- SL_B
 
 
-
-## (1) ranger district ----
+### ranger district ----
 ranger_districts <- vect("S_USA.BdyAdm_LSRS_RangerDistrict.shp")
 ranger_districts <- project(ranger_districts, "EPSG:5070")
 
@@ -243,84 +277,65 @@ RDs <- ranger_districts %>%
 # many PCUs span multiple RDs
   # use the centroid (convert polys to points)
   # more straight-forward than using relate() (as with the seedlots)
-PCU_centroids <- centroids(ARP_PCUs_vect)
+PCU_centroids <- centroids(ARP_PCUs_1A_vect)
 
 # extract RDs at centroids
-RD_at_centroid <- extract(RDs, PCU_centroids)
+RD_at_centroid <- extract(RDs, PCU_centroids, na.rm = TRUE)
 
 # add attributes 
-ARP_PCUs_vect$FORESTNAME <- RD_at_centroid$FORESTNAME 
-ARP_PCUs_vect$DISTRICTNA <- RD_at_centroid$DISTRICTNA 
-
-ARP_PCU_df <- as.data.frame(ARP_PCUs_vect)
+ARP_PCUs_1A_vect$FORESTNAME <- RD_at_centroid$FORESTNAME 
+ARP_PCUs_1A_vect$DISTRICTNA <- RD_at_centroid$DISTRICTNA 
 
 
-
-
-##
-## (2) seed zone ----
+### seed zone ----
 # this shapefiles came fom Katie
 CO_SZ <- vect("Colo_Seed_Zones.shp")
 CO_SZ <- project(CO_SZ, "EPSG:5070")
 
-### extract ----
-extract_SZ <- extract(CO_SZ, PCU_centroids)
+# extract
+extract_SZ <- extract(CO_SZ, PCU_centroids, na.rm = TRUE)
 str(extract_SZ)
 
 # add attributes 
-ARP_PCUs_vect$seed_zone <- extract_SZ$ZONE_NO 
+ARP_PCUs_1A_vect$seed_zone <- extract_SZ$ZONE_NO 
 
 
-
-
-##
-## (3) elevation band ----
+### elevation ----
 # using ARP_DEM created in Part1_A_3b
 ARP_DEM <- rast("ARP_DEM.tif")
 
-### classify EB ----
 # the DEM is in meters, but we want 500ft EBs
 # convert m to ft
 meters_to_feet_factor <- 3.28084
 ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
 summary(ARP_DEM_ft) # min = 4839, max = 14227 
 
-# create a matrix 
-elev.matrix <- matrix(c(seq(4000, 14000, 500), seq(4500, 14500, 500), seq(4500, 14500, 500)), ncol=3, byrow = FALSE)
-# becomes the top of the interval (max of range)
-
-# classify the DEM
-ARP_DEM_EB_rast <- classify(ARP_DEM_ft, rcl=elev.matrix, right=TRUE) # right = T ensures upper bound of interval included in band 
-plot(ARP_DEM_EB_rast, type = "classes")
-unique(ARP_DEM_EB_rast) # 20 unique values (EBs)
-
-### write & read ----
-writeRaster(ARP_DEM_EB_rast, "ARP_DEM_EB_rast.tif") 
-ARP_DEM_EB_rast <- rast("ARP_DEM_EB_rast.tif")
-
-summary(ARP_DEM_EB_rast)
-plot(is.na(ARP_DEM_EB_rast))
-
-### extract max ----
-extract_EB_max <- extract(ARP_DEM_EB_rast, ARP_PCUs_vect, fun=max)
-str(extract_EB_max)
-
-is_na <- extract_EB_max %>% 
-  filter(is.na(USGS_1_n41w106_20230314))
-
+# extract max
+Elv_max_df <- extract(ARP_DEM_ft, ARP_PCUs_1A_vect, fun=max, na.rm = TRUE)
+str(Elv_max_df)
 # rename col
-extract_EB_max <- extract_EB_max %>% 
-  rename(EB_max = USGS_1_n41w106_20230314)
+Elv_max_df <- Elv_max_df %>% 
+  rename(Elv_max_ft = USGS_1_n41w106_20230314) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-### extract min ----
-extract_EB_min <- extract(ARP_DEM_EB_rast, ARP_PCUs_vect, fun=min)
-str(extract_EB_min)
-# rename col
-extract_EB_min <- extract_EB_min %>% 
-  rename(EB_min = USGS_1_n41w106_20230314)
+# extract min
+Elv_min_df <- extract(ARP_DEM_ft, ARP_PCUs_1A_vect, fun=min, na.rm = TRUE)
+str(Elv_min_df)
+# adjust
+Elv_min_df <- Elv_min_df %>% 
+  rename(Elv_min_ft = USGS_1_n41w106_20230314) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-##
-## (4) EVH ----
+
+## (B) attributes: thresholds for PCUs ----
+# these attributes were used to create PCUs 
+# we used them to set thresholds (e.g. only areas with QMD > 5 inches)
+# here we will just extract the mean value for the metric across the whole PCU
+
+
+### EVH ----
 # like the way we used EVH in Part1_A_3d, but without the filtering
   # we just want to know the mean EVH for each PCU
 EVH_CONUS <- rast("LC23_EVH_240.tif")
@@ -340,15 +355,17 @@ ARP_tree_height <- ifel(
 )
 
 # extract value
-extract_EVH <- extract(ARP_tree_height, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
+extract_EVH <- extract(ARP_tree_height, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
   # need na.rm = TRUE because some areas (EVH < 100 or > 199) have already been filtered out
 str(extract_EVH)
-# rename col
+# adjust
 extract_EVH <- extract_EVH %>% 
-  rename(EVH_ft = CLASSNAMES)
+  rename(EVH_ft = CLASSNAMES) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-##
-## (4) QMD ----
+
+### QMD ----
 QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
 # already in 5070, value units are in inches
 plot(QMD_CONUS)
@@ -357,51 +374,33 @@ plot(QMD_CONUS)
 QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
 
 # extract value
-extract_QMD <- extract(QMD_ARP, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
+extract_QMD <- extract(QMD_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
 str(extract_QMD)
-# rename col
+# adjust
 extract_QMD <- extract_QMD %>% 
-  rename(QMD_in = CLASSNAMES)
+  rename(QMD_in = CLASSNAMES) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
 
-##
-## (5) CFP ----
-# using crown fire probability data from Part1_A_3a
-ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
-
-extract_CFP <- extract(ARP_risk_score_rast, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
-str(extract_CFP)
-# rename col
-extract_CFP <- extract_CFP %>% 
-  rename(CFP_prob = CLASSNAMES) # may need to change CLASSNAMES
-
-## 
-## (6) road ----
+### road ----
 # using ARP_road_rast from Part1_A_3c 
 ARP_road_rast <- rast("ARP_road_rast.tif") 
 
 # calculate the distance to nearest road for each raster cell (pixel)
 ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine") 
 
-extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
+extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
 str(extract_road_dist)
-# convert meters to miles
+# adjust
 extract_road_dist <- extract_road_dist %>% 
-  mutate(road_miles = layer * 0.000621371,
-         layer = NULL) # remove distance in meters
+  mutate(road_mi = layer * 0.000621371, # convert meters to miles
+         layer = NULL, # remove distance in meters column
+         PCU_ID = ARP_PCUs_1A_vect$PCU_ID)  %>% 
+  select(-1)
 
-## 
-## (7) road_score ----
-# # using ARP_road_score_rast from Part 3.c (above)
-# 
-# extract_road_score <- extract(ARP_road_score_rast, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
-# str(extract_road_score)
-# # rename col
-# extract_road_score <- extract_road_score %>% 
-#   rename(road_sc = layer)
 
-## 
-## (8) slope ----
+### slope ----
 # using DEM from Part1_A_3b
 ARP_DEM <- rast("ARP_DEM.tif")
 
@@ -409,157 +408,177 @@ ARP_DEM <- rast("ARP_DEM.tif")
 ARP_slope = terrain(DEM_ARP, v="slope", unit="degrees")
 plot(ARP_slope)
 
-extract_slope <- extract(ARP_slope, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
+extract_slope <- extract(ARP_slope, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
 str(extract_slope)
-# rename col
+# adjust
 extract_slope <- extract_slope %>% 
-  rename(slope_deg = slope)
-
-##
-# ## (8) slope_score ----
-# # using ARP_slope_score_rast, created in Hotspots_Part1b.R
-# 
-# extract_slope_score <- extract(ARP_slope_score_rast, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
-# str(extract_slope_score)
-# # rename col
-# extract_slope_score <- extract_slope_score %>% 
-#   rename(slope_sc = slope)
-
-##
-## (9) priority_s ----
-# combined "score" or "sum" from Part1_A_4
-ARP_priority_rast <- rast("ARP_priority_rast.tif")
-
-extract_priority_s <- extract(ARP_priority_rast, ARP_PCUs_vect, fun=mean, na.rm = TRUE)
-str(extract_priority_s)
-# rename col
-extract_priority_s <- extract_priority_s %>% 
-  rename(priority_s = score)
+  rename(slope_deg = slope) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
 
-##
-## (10) PIPO ----
+
+## (C) attributes: other objectives ----
+# these attributes are added to the PCU as a tool for objective-focused filtering
+
+
+### CFP ----
+# using crown fire probability data from Part1B_1A (setup)
+ARP_CFP_rast <- rast("ARP_CFP_rast.tif")
+
+extract_CFP <- extract(ARP_risk_score_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+str(extract_CFP)
+# adjust
+extract_CFP <- extract_CFP %>% 
+  rename(CFP_prob = CLASSNAMES) %>% # may need to change CLASSNAMES!!!!
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
+
+
+### PIPO ----
 # read 
 PIPO_BigMap <- rast("Hosted_AGB_0122_2018_PONDEROSA_PINE_08142023231656.tif")
-
 # project
 crs(PIPO_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
 PIPO_projected <- project(PIPO_BigMap, "EPSG:5070")
 crs(PIPO_projected) # EPSG 5070
-
 # crop & mask
 PIPO_ARP <- crop(PIPO_projected, ARP_vect, mask=TRUE, touches=TRUE)
 plot(PiPo_ARP)
-
 # extract
-extract_PIPO <- extract(PIPO_ARP, ARP_PCUs_vect, fun=mean, na.rm=TRUE)
+extract_PIPO <- extract(PIPO_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
 str(extract_PIPO)
-
-# rename col
+# adjust
 extract_PIPO <- extract_PIPO %>% 
-  rename(PIPO_tons = Hosted_AGB_0122_2018_PONDEROSA_PINE_08142023231656)
+  rename(PIPO_tons = Hosted_AGB_0122_2018_PONDEROSA_PINE_08142023231656) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-##
-## (11) PIEN ----
+
+### PIEN ----
 # read 
 PIEN_BigMap <- rast("Hosted_AGB_0093_2018_ENGELMANN_SPRUCE_05042023231614.tif")
-
 # project
 crs(PIEN_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
 PIEN_projected <- project(PIEN_BigMap, "EPSG:5070")
 crs(PIEN_projected) # EPSG 5070
-
 # crop & mask
 PIEN_ARP <- crop(PIEN_projected, ARP_vect, mask=TRUE, touches=TRUE)
 plot(PIEN_ARP)
-
 # extract
-extract_PIEN <- extract(PIEN_ARP, ARP_PCUs_vect, fun=mean, na.rm=TRUE)
+extract_PIEN <- extract(PIEN_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
 str(extract_PIEN)
-
-# rename col
+# adjust
 extract_PIEN <- extract_PIEN %>% 
-  rename(PIEN_tons = Hosted_AGB_0093_2018_ENGELMANN_SPRUCE_05042023231614)
+  rename(PIEN_tons = Hosted_AGB_0093_2018_ENGELMANN_SPRUCE_05042023231614) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-##
-## (12) PIFL2 ----
+
+### PIFL ----
 # read 
-PIFL2_BigMap <- rast("Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457.tif")
-
+PIFL_BigMap <- rast("Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457.tif")
 # project
-crs(PIFL2_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
-PIFL2_projected <- project(PIFL2_BigMap, "EPSG:5070")
-crs(PIFL2_projected) # EPSG 5070
-
+crs(PIFL_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
+PIFL_projected <- project(PIFL_BigMap, "EPSG:5070")
+crs(PIFL_projected) # EPSG 5070
 # crop & mask
-PIFL2_ARP <- crop(PIFL2_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PIFL2_ARP)
-
+PIFL_ARP <- crop(PIFL_projected, ARP_vect, mask=TRUE, touches=TRUE)
+plot(PIFL_ARP)
 # extract
-extract_PIFL2 <- extract(PIFL2_ARP, ARP_PCUs_vect, fun=mean, na.rm=TRUE)
-str(extract_PIFL2)
+extract_PIFL <- extract(PIFL_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+str(extract_PIFL)
+# adjust
+extract_PIFL <- extract_PIFL %>% 
+  rename(PIFL2_tons = Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-# rename col
-extract_PIFL2 <- extract_PIFL2 %>% 
-  rename(PIFL2_tons = Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457)
 
-##
-## (13) PICO ----
+### PICO ----
 # read 
 PICO_BigMap <- rast("Hosted_AGB_0108_2018_LODGEPOLE_PINE_05272023153302.tif")
-
 # project
 crs(PICO_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
 PICO_projected <- project(PICO_BigMap, "EPSG:5070")
 crs(PICO_projected) # EPSG 5070
-
 # crop & mask
 PICO_ARP <- crop(PICO_projected, ARP_vect, mask=TRUE, touches=TRUE)
 plot(PICO_ARP)
-
 # extract
-extract_PICO <- extract(PICO_ARP, ARP_PCUs_vect, fun=mean, na.rm=TRUE)
+extract_PICO <- extract(PICO_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
 str(extract_PICO)
-
-# rename col
+# adjust
 extract_PICO <- extract_PICO %>% 
-  rename(PICO_tons = Hosted_AGB_0108_2018_LODGEPOLE_PINE_05272023153302)
+  rename(PICO_tons = Hosted_AGB_0108_2018_LODGEPOLE_PINE_05272023153302) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
 
-##
-## (14) PSME ----
+
+### PSME ----
 # read 
 PSME_BigMap <- rast("Hosted_AGB_0202_2018_DOUGLAS_FIR_06012023172436.tif")
-
 # project
 crs(PSME_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
 PSME_projected <- project(PSME_BigMap, "EPSG:5070")
 crs(PSME_projected) # EPSG 5070
-
 # crop & mask
 PSME_ARP <- crop(PSME_projected, ARP_vect, mask=TRUE, touches=TRUE)
 plot(PSME_ARP)
-
 # extract
-extract_PSME <- extract(PSME_ARP, ARP_PCUs_vect, fun=mean, na.rm=TRUE)
+extract_PSME <- extract(PSME_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
 str(extract_PSME)
-
-# rename col
+# adjust
 extract_PSME <- extract_PSME %>% 
-  rename(PSME_tons = Hosted_AGB_0202_2018_DOUGLAS_FIR_06012023172436)
+  rename(PSME_tons = Hosted_AGB_0202_2018_DOUGLAS_FIR_06012023172436) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
+
+
+## (D) attributes: planting site-specific ----
+# these attributes will be added to the PCUs in part 3
+# we are keeping them separate because the attributes added in Part1B are not dependent on the case study planting units
 
 
 
+# (3) combine ----
+ARP_PCUs_1A_vect # has PCU_ID, area_acres, seedlot_A, seedlot_B, FORESTNAME, DISTRICTNA, seed_zone
+  # we added these one at a time (because they came from SpatVectors)
+# now add the others
+match_join_df <- Elv_max_df %>% 
+  left_join(Elv_min_df, by = "PCU_ID") %>% 
+  left_join(extract_EVH, by = "PCU_ID") %>% 
+  left_join(extract_QMD, by = "PCU_ID") %>% 
+  left_join(extract_slope, by = "PCU_ID") %>% 
+  left_join(extract_road_dist, by = "PCU_ID") %>% 
+  left_join(extract_CFP, by = "PCU_ID") %>% 
+  left_join(extract_PIPO, by = "PCU_ID") %>% 
+  left_join(extract_PIEN, by = "PCU_ID") %>% 
+  left_join(extract_PIFL, by = "PCU_ID") %>% 
+  left_join(extract_PICO, by = "PCU_ID")%>% 
+  left_join(extract_PSME, by = "PCU_ID")
+
+# merge with previous PCU spatvector, making new one with full attributes
+ARP_PCUs_vect <- ARP_PCUs_1A_vect %>% 
+  left_join(match_join_df, by = "PCU_ID")
+
+ARP_PCUs_df <- as.data.frame(ARP_PCUs_vect)
+
+## write & read ----
+write.csv(ARP_PCUs_df, "ARP_PCUs_df.csv", row.names = FALSE)
+writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
+ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 
 
-# combine ----
-ARP_PCUs_vect # has PCU_ID, area_acres, FORESTNAME, DISTRICTNA, seed_zone
-
+## can remove later ----
+# previous way to add
 # attributes to add
-attribute_list <- list(extract_combined_score, extract_EB_max, extract_EB_min, 
-                       extract_EVH, extract_FLEP8,
-                       extract_slope, extract_slope_score,
-                       extract_road_dist, extract_road_score,
-                       extract_PIPO, extract_PIEN, extract_PIFL2, extract_PICO, extract_PSME)
+attribute_list <- list(Elv_max_df, Elv_min_df, 
+                       extract_EVH, extract_QMD,
+                       extract_slope, 
+                       extract_road_dist,
+                       extract_CFP,
+                       extract_PIPO, extract_PIEN, extract_PIFL, extract_PICO, extract_PSME)
 str(attribute_list)
 
 # change "ID" to "PCU_ID" in attribute_list
@@ -572,12 +591,3 @@ attributes_combined_df <- Reduce(function(x, y) full_join(x, y, by = "PCU_ID"), 
 
 ARP_PCUs_atts_vect <- ARP_PCUs_vect %>% 
   left_join(attributes_combined_df, by = "PCU_ID")
-
-ARP_PCUs_atts_vect_df <- as.data.frame(ARP_PCUs_atts_vect)
-str(ARP_PCUs_atts_vect_df)
-
-write.csv(ARP_PCUs_atts_vect_df, "ARP_PCUs_atts_vect_df.csv", row.names = FALSE)
-
-### write & read ----
-writeVector(ARP_PCUs_atts_vect, "ARP_PCUs_atts_vect.shp")
-ARP_PCUs_atts_vect <- vect("ARP_PCUs_atts_vect.shp")

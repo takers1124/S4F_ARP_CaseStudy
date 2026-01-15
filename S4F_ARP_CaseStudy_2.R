@@ -36,9 +36,9 @@ PCU_LM <- ARP_PCUs_vect %>%
 
 # for our case study, we chose only the planting needs (PPUs) within the Cameron Peak fire boundary
   # and also only a subset of those planting needs which are in the 8500-9000 ft elevation band (EB)
-CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
+CP_PPU_8500_9000_vect <- vect("CP_PPU_8500_9000_vect.shp")
   # or, 9000-9500 ft EB
-CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
+CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
 
 
 # (1) import clims ----
@@ -212,22 +212,22 @@ str(PCU_ref_MCMT_df) # has original PCU attributes + new extracted climate metri
 
 #### ref ----
   # if want to plant seed adapted to reference climate (collected between 1961-1990 from same zone)
-ref_MCMT_PPU_df <- extract_clims(CL_PPU_9000_9500_vect, ref_ARP_rast)
+ref_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ref_ARP_rast)
 str(ref_MCMT_PPU_df)
 
 #### current ----
   # if want to plant seed adapted to current climate (collected today from same zone)
-curr_MCMT_PPU_df <- extract_clims(CL_PPU_9000_9500_vect, curr_ARP_rast)
+curr_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, curr_ARP_rast)
 str(curr_MCMT_PPU_df)
 
 #### ssp2 ----
   # if want to plant seed adapted to future ssp2 climate (collected today from different zone)
-ssp2_MCMT_PPU_df <- extract_clims(CL_PPU_9000_9500_vect, ssp2_ARP_rast)
+ssp2_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ssp2_ARP_rast)
 str(ssp2_MCMT_PPU_df)
 
 #### ssp5 ----
   # if want to plant seed adapted to future ssp5 climate (collected today from different zone)
-ssp5_MCMT_PPU_df <- extract_clims(CL_PPU_9000_9500_vect, ssp5_ARP_rast)
+ssp5_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ssp5_ARP_rast)
 str(ssp5_MCMT_PPU_df)
 
 

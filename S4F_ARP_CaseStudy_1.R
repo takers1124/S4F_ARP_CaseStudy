@@ -76,45 +76,101 @@ SRME_vect <- vect("SRME_vect.shp")
 
 # (3) pre-process data ----
 
-## (3.a) risk CFP ----
-# using the crown fire probability (CFP) dataset from Pyrologix 
+## EVH ----
+# using existing vegetation height (EVH) from LANDFIRE
+  # these values are not continuous
+  # also the veg height has an offset added
+    # e.g. value 103 = tree height of 3 meters
 
-### load & process ----
-CFP_49_41 <- rast("crown_fire_2025_c00049_r00041.tif")
-CFP_50_41 <- rast("crown_fire_2025_c00050_r00041.tif")
-CFP_50_40 <- rast("crown_fire_2025_c00050_r00040.tif")
-# CRS already in 5070
+EVH_CONUS <- rast("LC23_EVH_240.tif")
+crs(EVH_CONUS) # 5070
+res(EVH_CONUS) # 30 30
 
-# combine
-CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
-plot(CFP_mosaic)
+### crop / mask ----
+EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
 
-#### ** final change ----
-  # name this ARP_CFP_rast (replace "risk" with actual value "CFP)
-# crop and mask  
-ARP_risk_score_rast <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
-plot(ARP_risk_score_rast)
+### adjust values ----
+# define conversion factor
+meters_to_feet_factor <- 3.28084
 
-# the raster values are already 0-1 (probability)
-  # value 1 = highest risk
-  # no need to classify or calc inverse score (like other priority factors)
-
-### viz ----
-plot(ARP_risk_score_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+# reclassify with ifel()
+ARP_height_score_rast <- ifel(
+  # condition 1: it is dominant veg type trees? (values 100-199)
+  EVH_ARP >= 100 & EVH_ARP < 200,
+  # if TRUE, 
+  # condition 2: is it > 10 ft tall? 
+  ifel(
+    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
+    100, # if TRUE, reclassify to 100
+    NA # if FALSE, reclassify to NA
+  ),
+  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
+)
 
 ### stats ----
-global(ARP_risk_score_rast, fun = "notNA") # 7776004 cells 
-sum(ARP_risk_score_rast[] >= 0, na.rm = TRUE) # 7776004 cells
-# this dataset covers 100% of the ARP - no filtering areas out for low risk 
+# entire ARP = 7776004 cells
 
-### write & read file ----
-writeRaster(ARP_risk_score_rast, "ARP_risk_score_rast.tif")
-ARP_risk_score_rast <- rast("ARP_risk_score_rast.tif")
+# all veg area
+global(EVH_ARP >= 100, fun = "sum", na.rm = TRUE) # 7004697 cells
+(7004697/7776004)*100 # 90.08093 % of ARP is vegetated 
+
+# all tree area
+global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cells
+(5324379/7776004)*100 # 68.47192 % of ARP has trees 
+
+# trees > 10 ft area
+global(ARP_height_score_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
+(5219760/7776004)*100 # 67.12651 % of ARP has trees > 10 ft
+
+### viz ----
+plot(ARP_height_score_rast, col = "forestgreen")
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+### write & read ----
+writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
+ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
 
 
 
-## (3.b) slope ----
+## QMD ----
+# this is using quadratic mean diameter (QMD) from TreeMap 2022
+QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
+# already in 5070
+plot(QMD_CONUS)
+
+### crop and mask ----
+QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
+plot(QMD_ARP)
+
+# reclassify with ifel()
+ARP_diameter_score_rast <- ifel(
+  QMD_ARP >= 5, 50, NA 
+)
+# if >= 5 inches, reclassify to 50
+# if < 5 inches, reclassify to NA
+
+### stats ----
+# entire ARP = 7776004 cells 
+# all areas with QMD values
+global(QMD_ARP, fun = "notNA") # 5697616 cells
+(5697616/7776004)*100 # 73.27174 % of ARP has QMD values
+
+# areas with QMD > 5 inches
+global(ARP_diameter_score_rast, fun = "notNA") # 4160703
+(4160703/7776004)*100 # 53.50696 % of ARP has trees > 5 in QMD
+
+### viz ----
+# see classified values
+plot(ARP_diameter_score_rast, col = "darkgreen")
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+### write & read ----
+writeRaster(ARP_diameter_score_rast, "ARP_diameter_score_rast.tif")
+ARP_diameter_score_rast <- rast("ARP_diameter_score_rast.tif")
+
+
+
+## slope ----
 # this slope raster is generated using  
   # digital elevation model (DEM) tiles, downloaded from The National Map (USGS)
   # they are 1 Arc Sec
@@ -137,6 +193,7 @@ plot(ARP_DEM) # min = 1470.285 , max = 4393.409 (meters)
 ### write & read ----
 writeRaster(ARP_DEM, "ARP_DEM.tif")
 ARP_DEM <- rast("ARP_DEM.tif")
+
 
 ### calc slope ----
 ARP_slope = terrain(ARP_DEM, v="slope", unit="degrees")
@@ -252,97 +309,11 @@ ARP_road_score_rast <- rast("ARP_road_score_rast.tif")
 
 
 
-## (3.d) tree height ----
-# using existing vegetation height (EVH) from LANDFIRE
-  # these values are not continuous
-  # also the veg height has an offset added
-    # e.g. value 103 = tree height of 3 meters
-
-EVH_CONUS <- rast("LC23_EVH_240.tif")
-crs(EVH_CONUS) # 5070
-res(EVH_CONUS) # 30 30
-
-### crop / mask ----
-EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
-
-### adjust values ----
-# define conversion factor
-meters_to_feet_factor <- 3.28084
-
-# reclassify with ifel()
-ARP_height_score_rast <- ifel(
-  # condition 1: it is dominant veg type trees? (values 100-199)
-  EVH_ARP >= 100 & EVH_ARP < 200,
-  # if TRUE, 
-    # condition 2: is it > 10 ft tall? 
-  ifel(
-    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
-    100, # if TRUE, reclassify to 100
-    NA # if FALSE, reclassify to NA
-  ),
-  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
-)
-
-### stats ----
-# entire ARP = 7776004 cells
-
-# all veg area
-global(EVH_ARP >= 100, fun = "sum", na.rm = TRUE) # 7004697 cells
-(7004697/7776004)*100 # 90.08093 % of ARP is vegetated 
-
-# all tree area
-global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cells
-(5324379/7776004)*100 # 68.47192 % of ARP has trees 
-
-# trees > 10 ft area
-global(ARP_height_score_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
-(5219760/7776004)*100 # 67.12651 % of ARP has trees > 10 ft
-
-### viz ----
-plot(ARP_height_score_rast, col = "forestgreen")
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-
-### write & read ----
-writeRaster(ARP_height_score_rast, "ARP_height_score_rast.tif")
-ARP_height_score_rast <- rast("ARP_height_score_rast.tif")
 
 
 
-## (3.e) tree diameter ----
-# this is using quadratic mean diameter (QMD) from TreeMap 2022
-QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
-# already in 5070
-plot(QMD_CONUS)
 
-### crop and mask ----
-QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
-plot(QMD_ARP)
 
-# reclassify with ifel()
-ARP_diameter_score_rast <- ifel(
-  QMD_ARP >= 5, 50, NA 
-)
-# if >= 5 inches, reclassify to 50
-# if < 5 inches, reclassify to NA
-
-### stats ----
-# entire ARP = 7776004 cells 
-# all areas with QMD values
-global(QMD_ARP, fun = "notNA") # 5697616 cells
-(5697616/7776004)*100 # 73.27174 % of ARP has QMD values
-
-# areas with QMD > 5 inches
-global(ARP_diameter_score_rast, fun = "notNA") # 4160703
-(4160703/7776004)*100 # 53.50696 % of ARP has trees > 5 in QMD
-
-### viz ----
-# see classified values
-plot(ARP_diameter_score_rast, col = "darkgreen")
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-
-### write & read ----
-writeRaster(ARP_diameter_score_rast, "ARP_diameter_score_rast.tif")
-ARP_diameter_score_rast <- rast("ARP_diameter_score_rast.tif")
 
 
 
@@ -523,24 +494,24 @@ divided_polys_vect <- do.call(rbind, divided_polys_list)
   # 5366 geoms
 
 # combine the mid-sized polys with the newly divided large polys
-ARP_PCUs_vect <- rbind(mid_polys, divided_polys_vect)
+ARP_PCUs_1A_vect <- rbind(mid_polys, divided_polys_vect)
   # 6428 geoms
 
 ## adjust & stats ----
 
 # add new ID col & new final area col
-ARP_PCUs_vect$PCU_ID <- 1:nrow(ARP_PCUs_vect)
-ARP_PCUs_vect$area_acres <- expanse(ARP_PCUs_vect) * 0.000247105
+ARP_PCUs_1A_vect$PCU_ID <- 1:nrow(ARP_PCUs_vect)
+ARP_PCUs_1A_vect$area_acres <- expanse(ARP_PCUs_vect) * 0.000247105
 
-summary(ARP_PCUs_vect)
+summary(ARP_PCUs_1A_vect)
 # area_acres min = 10.74, max = 347.78    
 
 # select only new ID and area
-ARP_PCUs_vect <- ARP_PCUs_vect[, c("PCU_ID", "area_acres")]
+ARP_PCUs_1A_vect <- ARP_PCUs_1A_vect[, c("PCU_ID", "area_acres")]
 
-ARP_all_PCUs_df <- as.data.frame(ARP_PCUs_vect)
+ARP_PCUs_1A_df <- as.data.frame(ARP_PCUs_1A_vect)
 
-sum(ARP_PCUs_vect$area_acres) # 728204.8 acres
+sum(ARP_PCUs_1A_vect$area_acres) # 728204.8 acres
 sum(small_polys_removed$patch_acres) # 728204.8 acres
   # bc these are =, we know the divide function worked (retained all area)
 
@@ -555,18 +526,18 @@ sum(small_polys_removed$patch_acres) # 728204.8 acres
   
 
 ## viz ----
-plot(ARP_PCUs_vect)
+plot(ARP_PCUs_1A_vect)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 ### write & read ----
-writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
-ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
+writeVector(ARP_PCUs_1A_vect, "ARP_PCUs_1A_vect.shp")
+ARP_PCUs_1A_vect <- vect("ARP_PCUs_1A_vect.shp")
 
 ## select Lady Moon ----
   # this is the case study PCU that we will use for FWD climate matching in part 2
   # the PCU closest to the Lady Moon trail head has PCU_ID = 212
 
-PCU_LM <- ARP_PCUs_vect %>% 
+PCU_LM <- ARP_PCUs_1A_vect %>% 
   filter(PCU_ID == 212)
 plot(PCU_LM)
 
@@ -592,92 +563,85 @@ desired_cols <- c("REGION_COD", "ADMIN_FORE", "DISTRICT_C", "FACTS_ID", "ACTIVIT
     # if we were looking for all planting needs, would use code 4431
 desired_ids <- c("RA20CPPLNT")
   # for our case study, we just want this single polygon with FACTS_ID = RA20CPPLNT
-    # this is essentially all the Cameron Peak fire needs in 1 poly
-    # which are labeled CL for Canyon Lakes Ranger District
+    # this is essentially all the Cameron Peak (CP) fire needs in 1 poly
 
-CL_sample_need_poly <- needs_all %>%
+CP_sample_need_poly <- needs_all %>%
   select(all_of(desired_cols)) %>% 
   filter(FACTS_ID %in% desired_ids) 
 
-plot(CL_sample_need_poly)
+plot(CP_sample_need_poly)
 
 ## project ---- 
-CL_sample_need_poly <- project(CL_sample_need_poly, "EPSG:5070")
+CP_sample_need_poly <- project(CP_sample_need_poly, "EPSG:5070")
 
 ## divide ----
 # calc area for entire polygon
-CL_sample_need_poly$area_all <- expanse(CL_sample_need_poly) * 0.000247105
+CP_sample_need_poly$area_all <- expanse(CP_sample_need_poly) * 0.000247105
   # 49637 acres
 49637/200 # 248 (rough number of parts)
 
 set.seed(100)
-CL_PPUs_vect <- divide(CL_sample_need_poly, n = 250)
+CP_PPUs_vect <- divide(CP_sample_need_poly, n = 250)
   # 250 geoms
 
 # add ID 
-CL_PPUs_vect$PPU_ID <- 1:nrow(CL_PPUs_vect)
+CP_PPUs_vect$PPU_ID <- 1:nrow(CP_PPUs_vect)
 
 # new area of divided polys
-CL_PPUs_vect$area_acres <- expanse(CL_PPUs_vect) * 0.000247105
-summary(CL_PPUs_vect$area_acres)
+CP_PPUs_vect$area_acres <- expanse(CP_PPUs_vect) * 0.000247105
+summary(CP_PPUs_vect$area_acres)
 # min = 24.84    , max = 663.06  
 
 
-## add EBs ----
-# using the EBs created in part 1-6.c
-  # the ARP_DEM_vect was created in part 1-3.b
-ARP_DEM_EB_rast <- rast("ARP_DEM_EB_rast.tif")
+## add Elv ----
+# using the DEM created in part 1A_3b
+ARP_DEM <- rast("ARP_DEM.tif")
+
+# the DEM is in meters --> convert m to ft
+meters_to_feet_factor <- 3.28084
+ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
+summary(ARP_DEM_ft) # min = 4839, max = 14227
 
 # extract max
-EB_max_df <- extract(ARP_DEM_EB_rast, CL_PPUs_vect, fun=max)
-str(EB_max_df)
+Elv_max_df <- extract(ARP_DEM_ft, CL_PPUs_vect, fun=max)
+str(Elv_max_df)
 # rename col
-EB_max_df <- EB_max_df %>% 
+Elv_max_df <- Elv_max_df %>% 
   rename(PPU_ID = ID,
-         EB_max = USGS_1_n41w106_20230314)
+         Elv_max_ft = USGS_1_n41w106_20230314)
 
 # extract min
-EB_min_df <- extract(ARP_DEM_EB_rast, CL_PPUs_vect, fun=min)
-str(EB_min_df)
+Elv_min_df <- extract(ARP_DEM_ft, CL_PPUs_vect, fun=min)
+str(Elv_min_df)
 # rename col
-EB_min_df <- EB_min_df %>% 
+Elv_min_df <- Elv_min_df %>% 
   rename(PPU_ID = ID,
-         EB_min = USGS_1_n41w106_20230314)
+         Elv_min_ft = USGS_1_n41w106_20230314)
 
 
-EB_join_df <- left_join(EB_min_df, EB_max_df, by = "PPU_ID")
+Elv_join_df <- left_join(Elv_min_df, Elv_max_df, by = "PPU_ID")
 
-CL_PPUs_vect <- CL_PPUs_vect %>% 
-  left_join(EB_join_df, by = "PPU_ID")
+CP_PPUs_vect <- CP_PPUs_vect %>% 
+  left_join(Elv_join_df, by = "PPU_ID")
 
 ### write & read ----
-writeVector(CL_PPUs_vect, "CL_PPUs_vect.shp")
-CL_PPUs_vect <- vect("CL_PPUs_vect.shp")
+writeVector(CP_PPUs_vect, "CP_PPUs_vect.shp")
+CP_PPUs_vect <- vect("CP_PPUs_vect.shp")
 
-CL_PPUs_df <- as.data.frame(CL_PPUs_vect)
+CP_PPUs_df <- as.data.frame(CP_PPUs_vect)
 
 ## select ----
   # for the case study, we are only going to use the planting needs (PPUs)
-    # that are within the 8500 - 9000 ft EB
-CL_PPU_8500_9000_vect <- CL_PPUs_vect %>% 
-  filter(EB_min == 8500, EB_max == 9000)
-  # 13 geoms
+  # that are within the 9000 - 9500 ft EB
+CP_PPU_9000_9500_vect <- CP_PPUs_vect %>% 
+  filter(Elv_min_ft >= 9000, Elv_max_ft <= 9500)
+# XX geoms
 
 ### write & read ----
-writeVector(CL_PPU_8500_9000_vect, "CL_PPU_8500_9000_vect.shp")
-CL_PPU_8500_9000_vect <- vect("CL_PPU_8500_9000_vect.shp")
+writeVector(CP_PPU_9000_9500_vect, "CP_PPU_9000_9500_vect.shp")
+CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
 
-
-# that are within the 9000 - 9500 ft EB
-CL_PPU_9000_9500_vect <- CL_PPUs_vect %>% 
-  filter(EB_min == 9000, EB_max == 9500)
-# 20 geoms
-
-### write & read ----
-writeVector(CL_PPU_9000_9500_vect, "CL_PPU_9000_9500_vect.shp")
-CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
-
-sum(CL_PPU_9000_9500_vect$area_acres) # 3673.813 acres
+sum(CP_PPU_9000_9500_vect$area_acres) # XX acres
 
 
 

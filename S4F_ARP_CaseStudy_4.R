@@ -21,7 +21,7 @@ library(viridis)
   # created in part 1
 ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
-CL_PPU_9000_9500_vect <- vect("CL_PPU_9000_9500_vect.shp")
+CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
 
 # climate match_sum rasters (for masking)
   # created in part 3 with output from part 2
@@ -71,7 +71,7 @@ EVT_SRME_ssp2_rast <- crop(EVT_24CONUS_rast, ssp2_match_SRME_vect, mask = TRUE)
 plot(EVT_SRME_ssp2_rast)
 
 ### EVT16_PPUs ----
-EVT16_PPUs_rast <- crop(EVT_16CONUS_rast, CL_PPU_9000_9500_vect, mask = TRUE)
+EVT16_PPUs_rast <- crop(EVT_16CONUS_rast, CP_PPU_9000_9500_vect, mask = TRUE)
 plot(EVT16_PPUs_rast)
 
 
