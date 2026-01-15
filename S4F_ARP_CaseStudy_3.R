@@ -267,8 +267,8 @@ global(PPU_ssp5_match_sum_SRME_rast, fun = "notNA") # 21550 cells
     # and add this mean value as an attribute for each PCU, for each climate scenario
   
 # using the PCU vector created in part 1
-ARP_all_PCUs_vect <- vect("ARP_all_PCUs_vect.shp")
-plot(ARP_all_PCUs_vect)
+ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
+plot(ARP_PCUs_vect)
 
 # only using the 4 PPU_X_match_sum_ARP_rast (not the SRME too) because all PCUs are in the ARP
   # so only need the sum extent that covers all PCUs
@@ -276,43 +276,43 @@ plot(ARP_all_PCUs_vect)
 ### (a) extract ----
 #### ref ----
 # extract max "match value" across match_rast raster layers for each PCU
-ref_match_df <- extract(PPU_ref_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
+ref_match_df <- extract(PPU_ref_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
 str(ref_match_df)
 
 # add sum and PCU_ID; remove auto-gen ID from extract()
 ref_match_df2 <- ref_match_df %>% 
   mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
+         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
   select(-1)
 
 #### curr ----
 # extract max "match value" across match_rast raster layers for each PCU
-curr_match_df <- extract(PPU_curr_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
+curr_match_df <- extract(PPU_curr_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
 curr_match_df2 <- curr_match_df %>% 
   mutate(curr_sum = rowSums(curr_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
+         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
   select(-1)
 
 #### ssp2 ----
 # extract max "match value" across match_rast raster layers for each PCU
-ssp2_match_df <- extract(PPU_ssp2_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
+ssp2_match_df <- extract(PPU_ssp2_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
 ssp2_match_df2 <- ssp2_match_df %>% 
   mutate(ssp2_sum = rowSums(ssp2_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
+         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
   select(-1)
 
 #### ssp5 ----
 # extract max "match value" across match_rast raster layers for each PCU
-ssp5_match_df <- extract(PPU_ssp5_match_ARP_rast, ARP_all_PCUs_vect, fun = max, na.rm = TRUE)
+ssp5_match_df <- extract(PPU_ssp5_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
 
 # rename, arrange, add rank
 ssp5_match_df2 <- ssp5_match_df %>% 
   mutate(ssp5_sum = rowSums(ssp5_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_all_PCUs_vect$PCU_ID) %>% 
+         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
   select(-1)
 
 
@@ -325,7 +325,7 @@ match_join_df <- ref_match_df2 %>%
   left_join(ssp5_match_df2, by = "PCU_ID")
 
 # merge with spatvector
-ARP_PCUs_matched_full_vect <- ARP_all_PCUs_vect %>% 
+ARP_PCUs_matched_full_vect <- ARP_PCUs_vect %>% 
   left_join(match_join_df, by = "PCU_ID")
 
 ARP_PCUs_matched_full_df <- as.data.frame(ARP_PCUs_matched_full_vect)

@@ -18,7 +18,7 @@ ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
 
 # PCU SpatVector created in Part 1-A
-ARP_all_PCUs_vect <- vect("ARP_all_PCUs_vect.shp")
+ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
   # only has PCU_ID and area_acres as attributes
 
 ## nursery data integration ----
@@ -198,7 +198,7 @@ seed_SRME_vect <- seed_poly_vect %>%
   # and if they do overlap, the PCU will have the SL_ID added as an attribute for looking up later
 
 # compute spatial relationship
-SL_relate <- relate(ARP_all_PCUs_vect, seed_SRME_vect, relation = "intersects", pairs = TRUE, na.rm = TRUE)
+SL_relate <- relate(ARP_PCUs_vect, seed_SRME_vect, relation = "intersects", pairs = TRUE, na.rm = TRUE)
 str(SL_relate) # a list of vectors (one per PCU) with intersecting pairs
 
 # adjust data
@@ -217,18 +217,18 @@ second_hit <- filter(rel_df, hit == 2)
   # when expanding PCU creation to SRME, the # hits may be >2, so may need to adjust 
 
 # prepare attribute vectors
-SL_A <- rep(NA_character_, nrow(ARP_all_PCUs_vect))
-SL_B <- rep(NA_character_, nrow(ARP_all_PCUs_vect))
+SL_A <- rep(NA_character_, nrow(ARP_PCUs_vect))
+SL_B <- rep(NA_character_, nrow(ARP_PCUs_vect))
 
 # assign seedlot names by index
 SL_A[first_hit$pcu_idx]  <- seed_poly_vect$Lot[first_hit$seed_idx]
 SL_B[second_hit$pcu_idx] <- seed_poly_vect$Lot[second_hit$seed_idx]
 
 # attach attributes
-ARP_all_PCUs_vect$seedlot_A <- SL_A
-ARP_all_PCUs_vect$seedlot_B <- SL_B
+ARP_PCUs_vect$seedlot_A <- SL_A
+ARP_PCUs_vect$seedlot_B <- SL_B
 
-PCU_df <- as.data.frame(ARP_all_PCUs_vect)
+PCU_df <- as.data.frame(ARP_PCUs_vect)
 
 
 
@@ -243,16 +243,16 @@ RDs <- ranger_districts %>%
 # many PCUs span multiple RDs
   # use the centroid (convert polys to points)
   # more straight-forward than using relate() (as with the seedlots)
-PCU_centroids <- centroids(ARP_all_PCUs_vect)
+PCU_centroids <- centroids(ARP_PCUs_vect)
 
 # extract RDs at centroids
 RD_at_centroid <- extract(RDs, PCU_centroids)
 
 # add attributes 
-ARP_all_PCUs_vect$FORESTNAME <- RD_at_centroid$FORESTNAME 
-ARP_all_PCUs_vect$DISTRICTNA <- RD_at_centroid$DISTRICTNA 
+ARP_PCUs_vect$FORESTNAME <- RD_at_centroid$FORESTNAME 
+ARP_PCUs_vect$DISTRICTNA <- RD_at_centroid$DISTRICTNA 
 
-ARP_PCU_df <- as.data.frame(ARP_all_PCUs_vect)
+ARP_PCU_df <- as.data.frame(ARP_PCUs_vect)
 
 
 

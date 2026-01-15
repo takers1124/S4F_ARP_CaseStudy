@@ -25,7 +25,7 @@ SRME_vect <- vect("SRME_vect.shp")
 
 # the PCU closest to the Lady Moon trail head has PCU_ID = 212
   # we will use this for our case study
-PCU_LM <- ARP_all_PCUs_vect %>% 
+PCU_LM <- ARP_PCUs_vect %>% 
   filter(PCU_ID == 212)
 
 
