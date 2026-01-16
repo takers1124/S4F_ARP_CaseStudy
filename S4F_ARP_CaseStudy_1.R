@@ -439,7 +439,7 @@ global(ARP_combined_rast, fun = "notNA") # 7455285 cells
 
 
 ## filter & rescale ----
-# # final values can be 0-3 for ease of interpretation
+# final values can be 0-3 for ease of interpretation
 #
 # ARP_priority_rast <- ifel(
 #   combined_raster >= 150 & combined_raster <= 153,
@@ -459,19 +459,23 @@ global(ARP_combined_rast, fun = "notNA") # 7455285 cells
 #   # entire ARP = 1723619 acres
 # (832526.8/1723619)*100 # 48.30109 % of ARP
 #   # area total is a bit off from cell count, but close enough
-#
-# ## viz ----
-# plot(ARP_priority_rast)
-# polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-#
-# ### write & read ----
-# writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
-# ARP_priority_rast <- rast("ARP_priority_rast.tif")
 
+## filter ----
+ARP_priority_rast <- ifel(
+  ARP_combined_rast == 615,
+  1, NA)
 
-# note, all these areas meet our basic criteria (3.a - 3.d)
-# however, it is still too large of an area to scout
-# so, we must narrow it down further (part 1.5)
+global(ARP_priority_rast, fun = "notNA", na.rm = TRUE) # 2276055
+  # same as above
+
+## viz ----
+plot(ARP_priority_rast, col = "darkgreen")
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+### write & read ----
+writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
+ARP_priority_rast <- rast("ARP_priority_rast.tif")
+
 
 
 # (5) make PCUs ----
