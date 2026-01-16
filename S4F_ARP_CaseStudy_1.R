@@ -43,7 +43,7 @@ expanse(ARP_vect) # 6975245280 m^2
 
 expanse(ARP_vect, unit = "ha")
 
-### write & read ----
+#### write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
 ARP_vect <- vect("ARP_vect.shp")
 
@@ -69,68 +69,12 @@ plot(SRME_aggregated)
 # project 
 SRME_vect <- project(SRME_aggregated, "EPSG:5070")
 
-### write & read ----
+#### write & read ----
 writeVector(SRME_vect, "SRME_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
 
 
 # (3) pre-process data ----
-
-## EVH ----
-# using existing vegetation height (EVH) from LANDFIRE
-  # these values are not continuous
-  # also the veg height has an offset added
-    # e.g. value 103 = tree height of 3 meters
-
-EVH_CONUS <- rast("LC23_EVH_240.tif")
-crs(EVH_CONUS) # 5070
-res(EVH_CONUS) # 30 30
-
-### crop / mask ----
-EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
-
-### adjust values ----
-# define conversion factor
-meters_to_feet_factor <- 3.28084
-
-# reclassify with ifel()
-ARP_EVH_filt_rast <- ifel(
-  # condition 1: it is dominant veg type trees? (values 100-199)
-  EVH_ARP >= 100 & EVH_ARP < 200,
-  # if TRUE, 
-  # condition 2: is it > 10 ft tall? 
-  ifel(
-    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
-    100, # if TRUE, reclassify to 100
-    NA # if FALSE, reclassify to NA
-  ),
-  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
-)
-
-### stats ----
-# entire ARP = 7776004 cells
-
-# all veg area
-global(EVH_ARP >= 100, fun = "sum", na.rm = TRUE) # 7004697 cells
-(7004697/7776004)*100 # 90.08093 % of ARP is vegetated 
-
-# all tree area
-global(EVH_ARP >= 100 & EVH_ARP < 200, fun = "sum", na.rm = TRUE) # 5324379 cells
-(5324379/7776004)*100 # 68.47192 % of ARP has trees 
-
-# trees > 10 ft area
-global(ARP_EVH_filt_rast == 100, fun = "sum", na.rm = TRUE) # 5219760 cells
-(5219760/7776004)*100 # 67.12651 % of ARP has trees > 10 ft
-
-### viz ----
-plot(ARP_EVH_filt_rast, col = "forestgreen")
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-
-### write & read ----
-writeRaster(ARP_EVH_filt_rast, "ARP_EVH_filt_rast.tif")
-ARP_EVH_filt_rast <- rast("ARP_EVH_filt_rast.tif")
-
-
 
 ## QMD ----
 # this is using quadratic mean diameter (QMD) from TreeMap 2022
@@ -139,20 +83,27 @@ QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
 plot(QMD_CONUS)
 
 ### crop and mask ----
-QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
-plot(QMD_ARP)
+ARP_QMD_rast <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
+plot(ARP_QMD_rast)
+
+#### write & read ----
+writeRaster(ARP_QMD_rast, "ARP_QMD_rast.tif")
+ARP_QMD_rast <- rast("ARP_QMD_rast.tif")
+
+global(ARP_QMD_rast, fun = "notNA") # 5697616 cells
+
 
 # reclassify with ifel()
 ARP_QMD_filt_rast <- ifel(
-  QMD_ARP >= 5, 50, NA 
+  QMD_ARP_rast >= 5, 5, NA 
 )
-# if >= 5 inches, reclassify to 50
+# if >= 5 inches, reclassify to 5
 # if < 5 inches, reclassify to NA
 
 ### stats ----
 # entire ARP = 7776004 cells 
 # all areas with QMD values
-global(QMD_ARP, fun = "notNA") # 5697616 cells
+global(QMD_ARP_rast, fun = "notNA") # 5697616 cells
 (5697616/7776004)*100 # 73.27174 % of ARP has QMD values
 
 # areas with QMD > 5 inches
@@ -164,9 +115,84 @@ global(ARP_QMD_filt_rast, fun = "notNA") # 4160703
 plot(ARP_QMD_filt_rast, col = "darkgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
-### write & read ----
+#### write & read ----
 writeRaster(ARP_QMD_filt_rast, "ARP_QMD_filt_rast.tif")
 ARP_QMD_filt_rast <- rast("ARP_QMD_filt_rast.tif")
+
+
+
+## EVH ----
+# using existing vegetation height (EVH) from LANDFIRE
+  # these values are not continuous
+  # also the veg height has an offset added
+    # e.g. value 103 = tree height of 3 meters
+
+EVH_CONUS <- rast("LC24_EVH_250.tif")
+crs(EVH_CONUS) # 5070
+res(EVH_CONUS) # 30 30
+
+### crop / mask ----
+EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
+plot(EVH_ARP)
+
+levels_EVH <- levels(EVH_ARP)
+is.factor(EVH_ARP) # TRUE
+
+### all treed area ----
+  # EVH value = 101 = tree height 1 meter
+  # EVH value = 201 = shrub height 0.01 meter
+ARP_EVH_rast <- ifel(
+  EVH_ARP >= 101 & EVH_ARP < 200,
+  EVH_ARP, NA
+)
+
+plot(ARP_EVH_rast)
+global(ARP_EVH_rast, fun = "notNA") # 5311714
+
+#### write & read ----
+writeRaster(ARP_EVH_rast, "ARP_EVH_rast.tif")
+ARP_EVH_rast <- rast("ARP_EVH_rast.tif")
+
+### filter ----
+# define conversion factor
+meters_to_feet_factor <- 3.28084
+
+# reclassify with ifel()
+ARP_EVH_filt_rast <- ifel(
+  # condition 1: it is dominant veg type trees? (values 101-199)
+  EVH_ARP >= 101 & EVH_ARP < 200,
+  # if TRUE, 
+  # condition 2: is it > 10 ft tall? 
+  ifel(
+    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
+    10, # if TRUE, reclassify to 10
+    NA # if FALSE, reclassify to NA
+  ),
+  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
+)
+
+### stats ----
+# entire ARP = 7776004 cells
+
+# all veg area
+global(EVH_ARP >= 101, fun = "sum", na.rm = TRUE) # 7001131 cells
+(7001131/7776004)*100 # 90.03507 % of ARP is vegetated 
+
+# all tree area
+global(ARP_EVH_rast, fun = "notNA") # 5311714
+(5311714/7776004)*100 # 68.30904 % of ARP has trees 
+
+# trees > 10 ft area
+global(ARP_EVH_filt_rast, fun = "notNA") # 5231674
+(5231674/7776004)*100 # 67.27972 % of ARP has trees > 10 ft
+
+### viz ----
+plot(ARP_EVH_filt_rast, col = "forestgreen")
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
+#### write & read ----
+writeRaster(ARP_EVH_filt_rast, "ARP_EVH_filt_rast.tif")
+ARP_EVH_filt_rast <- rast("ARP_EVH_filt_rast.tif")
 
 
 
@@ -182,35 +208,39 @@ DEM_n41_w107 <- rast("USGS_1_n41w107_20230314.tif")
 DEM_n40_w106 <- rast("USGS_1_n40w106_20230602.tif")
 DEM_n40_w107 <- rast("USGS_1_n40w107_20220216.tif")
 # mosaic 4 tiles together
-ARP_DEM <- mosaic(DEM_n41_w106, DEM_n41_w107, DEM_n40_w106, DEM_n40_w107, fun="first")
+ARP_DEM <- mosaic(DEM_n41_w106, DEM_n41_w107, DEM_n40_w106, DEM_n40_w107, fun = "first")
 # project
 ARP_DEM <- project(ARP_DEM, "EPSG:5070")
 
 # crop and mask the DEM to the extent of ARP 
-ARP_DEM <- crop(ARP_DEM, ARP_vect, mask=TRUE)
-plot(ARP_DEM) # min = 1470.285 , max = 4393.409 (meters)
+ARP_DEM_rast <- crop(ARP_DEM, ARP_vect, mask=TRUE)
+plot(ARP_DEM_rast) # min = 1470.285 , max = 4393.409 (meters)
+plot(is.na(ARP_DEM_rast))
 
-### write & read ----
-writeRaster(ARP_DEM, "ARP_DEM.tif")
-ARP_DEM <- rast("ARP_DEM.tif")
-
+#### write & read ----
+writeRaster(ARP_DEM_rast, "ARP_DEM_rast.tif")
+ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
 
 ### calc slope ----
-ARP_slope = terrain(ARP_DEM, v="slope", unit="degrees")
-plot(ARP_slope)
+ARP_slope_rast = terrain(ARP_DEM_rast, v="slope", unit="degrees")
+plot(ARP_slope_rast)
+
+#### write & read ----
+writeRaster(ARP_slope_rast, "ARP_slope_rast.tif")
+ARP_slope_rast <- rast("ARP_slope_rast.tif")
 
 ### adjust values ----
-minmax(ARP_slope) 
+minmax(ARP_slope_rast) 
 # min = 0, max = 72.59397 
   # but the max we want to include is 24 degrees
   # and we want 0-24 degree slope to become 0-1 score (normalize)
 
-# make all values > 24 degrees NA, leave other values as-is
-ARP_slope_filt_rast <- ifel(ARP_slope > 24, NA, ARP_slope)
+# make all values > 24 degrees NA, make all other values 100
+ARP_slope_filt_rast <- ifel(ARP_slope_rast > 24, NA, 100)
 
 ### viz ----
 plot(ARP_slope_filt_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 
 plot(is.na(ARP_slope_filt_rast))
 
@@ -220,7 +250,7 @@ global(ARP_slope_filt_rast, fun = "notNA") # 7433981 cells
 # entire ARP = 7776004 cells 
 (7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
 
-### write & read ----
+#### write & read ----
 writeRaster(ARP_slope_filt_rast, "ARP_slope_filt_rast.tif")
 ARP_slope_filt_rast <- rast("ARP_slope_filt_rast.tif")
 
@@ -252,17 +282,17 @@ plot(is.na(ARP_road_rast)) # values not 1 are NA
   # but when I open the .tif in Arc, it looks fine 
   # I think it is too much for R studio to render with plot()
 
-### write & read file ----
+#### write & read file ----
 writeRaster(ARP_road_rast, "ARP_road_rast.tif")
 ARP_road_rast <- rast("ARP_road_rast.tif") 
 
 ### distance ----
 # we will calculate the distance to nearest road for each raster cell (pixel)
-ARP_road_dist_rast <- distance(ARP_road_rast, unit="m", method="haversine") 
+ARP_road_dist_rast <- distance(ARP_road_rast) 
 plot(ARP_road_dist_rast)
-# cell values = distance to nearest road (in meters)
+  # cell values = distance to nearest road (in meters)
 
-### write & read file ----
+#### write & read file ----
 writeRaster(ARP_road_dist_rast, "ARP_road_dist_rast.tif")
 ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
 
@@ -270,19 +300,19 @@ ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
 minmax(ARP_road_dist_rast) 
 # min = 0, max = 37416.17 
   # but the max we want to include is 917.3261 meters (0.57 miles)
-  # and we want 0-917 m distance to become 0-1 score (normalize)
+  # if < threshold, make value 500
 
-# make NA all values > 917.3261 meters, leave other values as-is
-road_filt_rast <- ifel(ARP_road_dist_rast > 917.3261, NA, ARP_road_dist_rast)
-plot(road_filtered)
+# make NA all values > 917.3261 meters, make others 500
+ARP_road_filt_rast <- ifel(ARP_road_dist_rast > 917.3261, NA, 500)
+plot(ARP_road_filt_rast)
 
 ### crop ----
 # need to crop again bc the road distance buffer goes a bit outside of the ARP
-ARP_road_filt_rast = crop(road_filt_rast, ARP_vect, mask = TRUE)
+ARP_road_filt_rast = crop(ARP_road_filt_rast, ARP_vect, mask = TRUE)
 
 ### viz ----
 plot(ARP_road_filt_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=1)
 plot(is.na(ARP_road_filt_rast))
 
 ### stats ----
@@ -291,7 +321,7 @@ global(ARP_road_filt_rast, fun = "notNA") # 5213776 cells
 # entire ARP = 7776004 cells 
 (5213776/7776004)*100 # 67.04955 % remaining  
 
-### write & read ----
+#### write & read ----
 writeRaster(ARP_road_filt_rast, "ARP_road_filt_rast.tif")
 ARP_road_filt_rast <- rast("ARP_road_filt_rast.tif")
 
@@ -304,113 +334,139 @@ ARP_road_filt_rast <- rast("ARP_road_filt_rast.tif")
 
 ## resample ----
 # first, the rasters need to be resampled so their extents align,
-  # and they have matching resolutions and origins 
-# 4 of the 5 rasters have the same resolution
-# 3 of the 5 rasters already have matching extents
-  # I am randomly choosing 1 of those 3 to use as the template
-    # raster [[5]] in the list
+  # and they have matching resolutions and origins
 
-# make a raster list 
-raster_list <- list(ARP_risk_score_rast, ARP_slope_score_rast, 
-                    ARP_road_score_rast, ARP_height_score_rast, 
-                    ARP_diameter_score_rast)
+# 3 of the 4 rasters have matching resolutions (QMD, EVH, and road)
+# 2 of the 4 rasters have matching extents (QMD, EVH)
+# 1 of the 4 rasters has no matching resolution or extent (slope)
+  # I am choosing EVH to use as the template
+  
+slope_resampled <- resample(ARP_slope_filt_rast, ARP_EVH_filt_rast, method = "near")
+road_resampled <- resample(ARP_road_filt_rast, ARP_EVH_filt_rast, method = "near")
 
-# set template for resampling
-template_raster <- raster_list[[5]]
-
-# resample the remaining rasters to match the template
-# rasters 1, 2, and 3 in the list have continuous values
-  # use bilinear interpolation 
-resampled_continuous <- lapply(raster_list[1:3], function(r) {
-    resample(r, template_raster, method = "bilinear")
-})
-
-# rasters 4 and 5 in the list have binary values 
-  # use nearest neighbor
-resampled_binary <- lapply(raster_list[4:5], function(r) {
-  resample(r, template_raster, method = "near")
-})
-
-# combine into new list
-resampled_rast_list <- c(resampled_continuous, resampled_binary)
-  # all 5 rasters have same extent, resolution, etc
+raster_list <- list(ARP_EVH_filt_rast,
+                    ARP_QMD_filt_rast,
+                    slope_resampled,
+                    road_resampled)
 
 # create a multi-layer raster stack 
-resampled_rast_stack <- rast(resampled_rast_list)
-  # has 5 layers
+resampled_rast_stack <- rast(raster_list)
+  # has 4 layers, each has same extent and resolution
 
 ## sum ----
-combined_raster <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
-  # has values: min = 0, max = 153
+ARP_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+  # has values: min = 5, max = 615
 
 ## viz ----
-plot(combined_raster)
+plot(ARP_combined_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
+plot(is.na(ARP_combined_rast))
 
 ## stats ----
-# entire ARP = 7776004 cells 
-# want to know how many cells (what % of ARP) falls into each category
+# we want to know what % of the ARP each category falls into
+  # need a total # cells in the ARP to compare
+global(ARP_DEM_rast, fun = "notNA") # 6282487 cells (covers all ARP)
+  # but not same resolution as rest of data
+DEM_resampled <- resample(ARP_DEM_rast, ARP_EVH_filt_rast, method = "near")
+  # not same resolution and extent
+global(DEM_resampled, fun = "notNA") # 7773990 cells (covers all ARP)
 
-# cat 0: all values not NA
-global(combined_raster, fun = "notNA") # 7778382 cells 
-(7778382/7776004)*100 # 100.0306 % of ARP 
-  # not sure why it is > 100%
+# value 5, QMD only
+global(ARP_combined_rast == 5, fun = "sum", na.rm = TRUE) # 25120 cells
+(25120/7773990)*100 # 0.3231288 % of ARP
 
-# cat 1: values 0-3
-  # slope, road, and risk combined & continuous values
-  # but does not meet QMD or EVH threshold
-global(combined_raster >= 0 & combined_raster <= 3, fun = "sum", na.rm = TRUE) # 2141385 cells
-(2141385/7776004)*100 # 27.53837 % of ARP 
+# value 10, EVH only
+global(ARP_combined_rast == 10, fun = "sum", na.rm = TRUE) # 90042 cells
+(90042/7773990)*100 # 1.158247 % of ARP
 
-# cat 2: values 50-53
-  # just meet's QMD threshold
-  # dense/wide but short (e.g. shelterwood, post-fire, krummholz, pinyon/limber)
-global(combined_raster >= 50 & combined_raster <= 53, fun = "sum", na.rm = TRUE) # 417237 cells
-(417237/7776004)*100 # 5.365699 % of ARP 
+# value 15, QMD + EVH
+global(ARP_combined_rast == 15, fun = "sum", na.rm = TRUE) # 188102 cells
+(188102/7773990)*100 # 2.419633 % of ARP
 
-# cat 3: values 100-103
-  # just meet's EVH threshold
-  # tall but not dense/wide (e.g. open-canopy lodgepole/pondo)
-global(combined_raster >= 100 & combined_raster <= 103, fun = "sum", na.rm = TRUE) # 1476294 cells
-(1476294/7776004)*100 # 18.98525 % of ARP 
+# value 100, slope only
+global(ARP_combined_rast == 100, fun = "sum", na.rm = TRUE) # 601784 cells
+(601784/7773990)*100 # 7.740993 % of ARP
 
-# cat 4: values 150-153
-  # meet both QMD and EVH thresholds
-global(combined_raster >= 150 & combined_raster <= 153, fun = "sum", na.rm = TRUE) # 3743466 cells
-(3743466/7776004)*100 # 48.14126 % of ARP 
+# value 105, slope + QMD
+global(ARP_combined_rast == 105, fun = "sum", na.rm = TRUE) # 89504 cells
+(89504/7773990)*100 # 1.151326 % of ARP
 
-27.53837+5.365699+18.98525+48.14126 # 100.0306 - it adds up! 
+# value 110, slope + EVH
+global(ARP_combined_rast == 110, fun = "sum", na.rm = TRUE) # 411384 cells
+(411384/7773990)*100 # 5.2918 % of ARP
+
+# value 115, slope + EVH + QMD
+global(ARP_combined_rast == 115, fun = "sum", na.rm = TRUE) # 835573 cells
+(835573/7773990)*100 # 10.74832 % of ARP
+
+# value 500, road only
+global(ARP_combined_rast == 500, fun = "sum", na.rm = TRUE) # 211065 cells
+(211065/7773990)*100 # 2.715015 % of ARP
+
+# value 505, road + QMD
+global(ARP_combined_rast == 505, fun = "sum", na.rm = TRUE) # 51904 cells
+(51904/7773990)*100 # 0.6676623 % of ARP
+
+# value 510, road + EVH
+global(ARP_combined_rast == 510, fun = "sum", na.rm = TRUE) # 165873 cells
+(165873/7773990)*100 # 2.133692 % of ARP
+
+# value 515, road + EVH + QMD
+global(ARP_combined_rast == 515, fun = "sum", na.rm = TRUE) # 440692 cells
+(440692/7773990)*100 # 5.668801 % of ARP
+
+# value 600, road + slope
+global(ARP_combined_rast == 600, fun = "sum", na.rm = TRUE) # 990481 cells
+(990481/7773990)*100 # 12.74096 % of ARP
+
+# value 605, road + slope + QMD
+global(ARP_combined_rast == 605, fun = "sum", na.rm = TRUE) # 253753 cells
+(253753/7773990)*100 # 3.264128 % of ARP
+
+# value 610, road + slope + EVH
+global(ARP_combined_rast == 610, fun = "sum", na.rm = TRUE) # 823953 cells
+(823953/7773990)*100 # 10.59884 % of ARP
+
+# value 615, road + slope + QMD + EVH
+global(ARP_combined_rast == 615, fun = "sum", na.rm = TRUE) # 2276055 cells
+(2276055/7773990)*100 # 29.27782 % of ARP
+
+# value notNA
+global(ARP_combined_rast, fun = "notNA") # 7455285 cells
+(7455285/7773990)*100 # 95.90037 % of ARP
+100-95.90037 # 4.09963 % is NA (QMD < 5in, EVH < 10ft, slope >24, road >0.57)
+
 
 ## filter & rescale ----
-# final values can be 0-3 for ease of interpretation 
-
-ARP_priority_rast <- ifel(
-  combined_raster >= 150 & combined_raster <= 153,
-  combined_raster - 150, NA
-) %>% 
-  rename(priority_s = sum)
-
-# just confirm filter
-global(ARP_priority_rast, fun = "notNA") # 3743466 cells (same as Cat 4 ^)
-(3743466/7776004)*100 # 48.14126 % of ARP
-
-## calc area ----
-  # transform = FALSE bc already an equal-area projection, EPSG: 5070, Conus Albers
-  # default units are m^2
-expanse(ARP_priority_rast, transform = FALSE) # 3369119400 m^2
-3369119400/4046.86 # 4046.86 m2/acre = 832526.8 acres
-  # entire ARP = 1723619 acres
-(832526.8/1723619)*100 # 48.30109 % of ARP 
-  # area total is a bit off from cell count, but close enough
-
-## viz ----
-plot(ARP_priority_rast)
-polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
-
-## write & read ----
-writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
-ARP_priority_rast <- rast("ARP_priority_rast.tif")
+# # final values can be 0-3 for ease of interpretation
+#
+# ARP_priority_rast <- ifel(
+#   combined_raster >= 150 & combined_raster <= 153,
+#   combined_raster - 150, NA
+# ) %>%
+#   rename(priority_s = sum)
+#
+# # just confirm filter
+# global(ARP_priority_rast, fun = "notNA") # 3743466 cells (same as Cat 4 ^)
+# (3743466/7776004)*100 # 48.14126 % of ARP
+#
+# ## calc area ----
+#   # transform = FALSE bc already an equal-area projection, EPSG: 5070, Conus Albers
+#   # default units are m^2
+# expanse(ARP_priority_rast, transform = FALSE) # 3369119400 m^2
+# 3369119400/4046.86 # 4046.86 m2/acre = 832526.8 acres
+#   # entire ARP = 1723619 acres
+# (832526.8/1723619)*100 # 48.30109 % of ARP
+#   # area total is a bit off from cell count, but close enough
+#
+# ## viz ----
+# plot(ARP_priority_rast)
+# polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+#
+# ### write & read ----
+# writeRaster(ARP_priority_rast, "ARP_priority_rast.tif")
+# ARP_priority_rast <- rast("ARP_priority_rast.tif")
 
 
 # note, all these areas meet our basic criteria (3.a - 3.d)
