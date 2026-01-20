@@ -301,10 +301,10 @@ ARP_PCUs_1A_vect$seed_zone <- extract_SZ$ZONE_NO
 
 
 ### elevation ----
-# using ARP_DEM created in Part1_A_3b
-ARP_DEM <- rast("ARP_DEM.tif")
+# using ARP_DEM created in Part1A_3b
+ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
 
-# the DEM is in meters, but we want 500ft EBs
+# the DEM is in meters, but we want ft
 # convert m to ft
 meters_to_feet_factor <- 3.28084
 ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
@@ -331,50 +331,14 @@ Elv_min_df <- Elv_min_df %>%
 
 ## (B) attributes: thresholds for PCUs ----
 # these attributes were used to create PCUs 
-# we used them to set thresholds (e.g. only areas with QMD > 5 inches)
-# here we will just extract the mean value for the metric across the whole PCU
-
-
-### EVH ----
-# like the way we used EVH in Part1_A_3d, but without the filtering
-  # we just want to know the mean EVH for each PCU
-EVH_CONUS <- rast("LC23_EVH_240.tif")
-EVH_ARP <- crop(EVH_CONUS, ARP_vect, mask=TRUE)
-
-# define conversion factor
-meters_to_feet_factor <- 3.28084
-
-# reclassify with ifel()
-ARP_tree_height <- ifel(
-  # condition 1: it is dominant veg type trees? (values 100-199)
-  EVH_ARP >= 100 & EVH_ARP < 200,
-  # if TRUE, subtract offset & convert units
-    (EVH_ARP - 100) * meters_to_feet_factor,
-  # if FALSE, not a tree value, reclassify to NA
-   NA 
-)
-
-# extract value
-extract_EVH <- extract(ARP_tree_height, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
-  # need na.rm = TRUE because some areas (EVH < 100 or > 199) have already been filtered out
-str(extract_EVH)
-# adjust
-extract_EVH <- extract_EVH %>% 
-  rename(EVH_ft = CLASSNAMES) %>% 
-  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
-  select(-1)
-
+# we used them to set thresholds (e.g. only areas with QMD > 5 inches) in Part1A_3
+# here we will just extract the mean value for the metric across each PCU polygon
 
 ### QMD ----
-QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
-# already in 5070, value units are in inches
-plot(QMD_CONUS)
-
-# crop and mask
-QMD_ARP <- crop(QMD_CONUS, ARP_vect, mask=TRUE)
+ARP_QMD_rast <- rast("ARP_QMD_rast.tif")
 
 # extract value
-extract_QMD <- extract(QMD_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+extract_QMD <- extract(ARP_QMD_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
 str(extract_QMD)
 # adjust
 extract_QMD <- extract_QMD %>% 
@@ -383,8 +347,32 @@ extract_QMD <- extract_QMD %>%
   select(-1)
 
 
+### EVH ----
+ARP_EVH_rast <- rast("ARP_EVH_rast.tif")
+
+# extract value
+extract_EVH <- extract(ARP_EVH_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+str(extract_EVH)
+# adjust
+extract_EVH <- extract_EVH %>% 
+  rename(EVH_ft = CLASSNAMES) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
+
+
+### slope ----
+ARP_slope_rast <- rast("ARP_slope_rast.tif")
+
+extract_slope <- extract(ARP_slope_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+str(extract_slope)
+# adjust
+extract_slope <- extract_slope %>% 
+  rename(slope_deg = slope) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
+
+
 ### road ----
-# using ARP_road_dist_rast from Part1A_3 
 ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
 
 extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
@@ -397,21 +385,7 @@ extract_road_dist <- extract_road_dist %>%
   select(-1)
 
 
-### slope ----
-# using DEM from Part1_A_3b
-ARP_DEM <- rast("ARP_DEM.tif")
 
-# calc slope
-ARP_slope = terrain(DEM_ARP, v="slope", unit="degrees")
-plot(ARP_slope)
-
-extract_slope <- extract(ARP_slope, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
-str(extract_slope)
-# adjust
-extract_slope <- extract_slope %>% 
-  rename(slope_deg = slope) %>% 
-  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
-  select(-1)
 
 
 
@@ -570,21 +544,21 @@ ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 ## can remove later ----
 # previous way to add
 # attributes to add
-attribute_list <- list(Elv_max_df, Elv_min_df, 
-                       extract_EVH, extract_QMD,
-                       extract_slope, 
-                       extract_road_dist,
-                       extract_CFP,
-                       extract_PIPO, extract_PIEN, extract_PIFL, extract_PICO, extract_PSME)
-str(attribute_list)
-
-# change "ID" to "PCU_ID" in attribute_list
-renamed_list <- lapply(attribute_list, function(df) {
-  df %>% rename(PCU_ID = ID)
-})
-str(renamed_list)
-
-attributes_combined_df <- Reduce(function(x, y) full_join(x, y, by = "PCU_ID"), renamed_list)
-
-ARP_PCUs_atts_vect <- ARP_PCUs_vect %>% 
-  left_join(attributes_combined_df, by = "PCU_ID")
+# attribute_list <- list(Elv_max_df, Elv_min_df, 
+#                        extract_EVH, extract_QMD,
+#                        extract_slope, 
+#                        extract_road_dist,
+#                        extract_CFP,
+#                        extract_PIPO, extract_PIEN, extract_PIFL, extract_PICO, extract_PSME)
+# str(attribute_list)
+# 
+# # change "ID" to "PCU_ID" in attribute_list
+# renamed_list <- lapply(attribute_list, function(df) {
+#   df %>% rename(PCU_ID = ID)
+# })
+# str(renamed_list)
+# 
+# attributes_combined_df <- Reduce(function(x, y) full_join(x, y, by = "PCU_ID"), renamed_list)
+# 
+# ARP_PCUs_atts_vect <- ARP_PCUs_vect %>% 
+#   left_join(attributes_combined_df, by = "PCU_ID")
