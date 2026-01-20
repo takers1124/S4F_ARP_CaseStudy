@@ -92,23 +92,12 @@ ARP_QMD_rast <- rast("ARP_QMD_rast.tif")
 
 global(ARP_QMD_rast, fun = "notNA") # 5697616 cells
 
-
 # reclassify with ifel()
 ARP_QMD_filt_rast <- ifel(
   QMD_ARP_rast >= 5, 5, NA 
 )
 # if >= 5 inches, reclassify to 5
 # if < 5 inches, reclassify to NA
-
-### stats ----
-# entire ARP = 7776004 cells 
-# all areas with QMD values
-global(QMD_ARP_rast, fun = "notNA") # 5697616 cells
-(5697616/7776004)*100 # 73.27174 % of ARP has QMD values
-
-# areas with QMD > 5 inches
-global(ARP_QMD_filt_rast, fun = "notNA") # 4160703
-(4160703/7776004)*100 # 53.50696 % of ARP has trees > 5 in QMD
 
 ### viz ----
 # see classified values
@@ -171,21 +160,6 @@ ARP_EVH_filt_rast <- ifel(
   NA # if not a tree value (condition 1 = FALSE), reclassify to NA
 )
 
-### stats ----
-# entire ARP = 7776004 cells
-
-# all veg area
-global(EVH_ARP >= 101, fun = "sum", na.rm = TRUE) # 7001131 cells
-(7001131/7776004)*100 # 90.03507 % of ARP is vegetated 
-
-# all tree area
-global(ARP_EVH_rast, fun = "notNA") # 5311714
-(5311714/7776004)*100 # 68.30904 % of ARP has trees 
-
-# trees > 10 ft area
-global(ARP_EVH_filt_rast, fun = "notNA") # 5231674
-(5231674/7776004)*100 # 67.27972 % of ARP has trees > 10 ft
-
 ### viz ----
 plot(ARP_EVH_filt_rast, col = "forestgreen")
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
@@ -243,12 +217,6 @@ plot(ARP_slope_filt_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 
 plot(is.na(ARP_slope_filt_rast))
-
-### stats ----
-global(ARP_slope_filt_rast, fun = "notNA") # 7433981 cells 
-
-# entire ARP = 7776004 cells 
-(7433981/7776004)*100 # 95.60156 % remaining after 24* filter 
 
 #### write & read ----
 writeRaster(ARP_slope_filt_rast, "ARP_slope_filt_rast.tif")
@@ -315,12 +283,6 @@ plot(ARP_road_filt_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1)
 plot(is.na(ARP_road_filt_rast))
 
-### stats ----
-global(ARP_road_filt_rast, fun = "notNA") # 5213776 cells 
-
-# entire ARP = 7776004 cells 
-(5213776/7776004)*100 # 67.04955 % remaining  
-
 #### write & read ----
 writeRaster(ARP_road_filt_rast, "ARP_road_filt_rast.tif")
 ARP_road_filt_rast <- rast("ARP_road_filt_rast.tif")
@@ -328,9 +290,6 @@ ARP_road_filt_rast <- rast("ARP_road_filt_rast.tif")
 
 
 # (4) combine data ----
-## ** need to re-run ----
-  # may need to change resampling technique with new raster changes (above)
-
 
 ## resample ----
 # first, the rasters need to be resampled so their extents align,
@@ -363,14 +322,56 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
 
 plot(is.na(ARP_combined_rast))
 
+
 ## stats ----
-# we want to know what % of the ARP each category falls into
+# we want to know what % of the ARP each priority factor (PF) & combo occupies
   # need a total # cells in the ARP to compare
 global(ARP_DEM_rast, fun = "notNA") # 6282487 cells (covers all ARP)
   # but not same resolution as rest of data
-DEM_resampled <- resample(ARP_DEM_rast, ARP_EVH_filt_rast, method = "near")
-  # not same resolution and extent
+DEM_resampled <- resample(ARP_DEM_rast, ARP_EVH_filt_rast, method = "bilinear")
+  # now has same "standard" resolution and extent (see above)
 global(DEM_resampled, fun = "notNA") # 7773990 cells (covers all ARP)
+
+
+### independent PFs  ----
+#### QMD ----
+# all areas with QMD values
+global(ARP_QMD_rast, fun = "notNA") # 5697616 cells
+(5697616/7773990)*100 # 73.29076 % of ARP has QMD values
+
+# areas with QMD > 5 inches
+global(ARP_QMD_filt_rast, fun = "notNA") # 4160703
+(4160703/7773990)*100 # 53.52082 % of ARP has trees > 5 in QMD
+
+
+#### EVH ----
+# all veg area
+global(EVH_ARP >= 101, fun = "sum", na.rm = TRUE) # 7001131 cells
+(7001131/7773990)*100 # 90.0584 % of ARP is vegetated 
+
+# all tree area
+global(ARP_EVH_rast, fun = "notNA") # 5311714
+(5311714/7773990)*100 # 68.32674 % of ARP has trees 
+
+# trees > 10 ft area
+global(ARP_EVH_filt_rast, fun = "notNA") # 5231674
+(5231674/7773990)*100 # 67.29715 % of ARP has trees > 10 ft
+
+
+#### slope ----
+  # need to use resampled version (above) to get same resolution and extent
+global(slope_resampled, fun = "notNA") # 6282487 cells 
+(6282487/7773990)*100 # 80.81419 % remaining after 24* filter
+
+#### road ----
+# need to use resampled version (above) to get same extent
+global(road_resampled, fun = "notNA") # 5213776 cells 
+# entire ARP = 7773990 cells 
+(5213776/7773990)*100 # 67.06692 % remaining 
+
+
+## combined PFs ----
+# we want to know what % of the ARP each category falls into after combining
 
 # value 5, QMD only
 global(ARP_combined_rast == 5, fun = "sum", na.rm = TRUE) # 25120 cells
@@ -434,39 +435,28 @@ global(ARP_combined_rast == 615, fun = "sum", na.rm = TRUE) # 2276055 cells
 
 # value notNA
 global(ARP_combined_rast, fun = "notNA") # 7455285 cells
-(7455285/7773990)*100 # 95.90037 % of ARP
+(7455285/7773990)*100 # 95.90037 % of ARP (equals the sum of above %s)
 100-95.90037 # 4.09963 % is NA (QMD < 5in, EVH < 10ft, slope >24, road >0.57)
 
 
-## filter & rescale ----
-# final values can be 0-3 for ease of interpretation
-#
-# ARP_priority_rast <- ifel(
-#   combined_raster >= 150 & combined_raster <= 153,
-#   combined_raster - 150, NA
-# ) %>%
-#   rename(priority_s = sum)
-#
-# # just confirm filter
-# global(ARP_priority_rast, fun = "notNA") # 3743466 cells (same as Cat 4 ^)
-# (3743466/7776004)*100 # 48.14126 % of ARP
-#
-# ## calc area ----
-#   # transform = FALSE bc already an equal-area projection, EPSG: 5070, Conus Albers
-#   # default units are m^2
-# expanse(ARP_priority_rast, transform = FALSE) # 3369119400 m^2
-# 3369119400/4046.86 # 4046.86 m2/acre = 832526.8 acres
-#   # entire ARP = 1723619 acres
-# (832526.8/1723619)*100 # 48.30109 % of ARP
-#   # area total is a bit off from cell count, but close enough
 
-## filter ----
+## filter & adjust value ----
+  # make cell value = 1 for all areas that meet our PFs & value = NA if not
 ARP_priority_rast <- ifel(
   ARP_combined_rast == 615,
   1, NA)
 
-global(ARP_priority_rast, fun = "notNA", na.rm = TRUE) # 2276055
-  # same as above
+# just confirm filter
+global(ARP_priority_rast, fun = "notNA") # 2276055 cells (same as value=615 above)
+(2276055/7773990)*100 # 29.27782 % of ARP
+
+## calc area ---- 
+  # transform = FALSE bc already an equal-area projection, EPSG: 5070, Conus Albers
+  # default units are m^2
+expanse(ARP_priority_rast, transform = FALSE) # 2048449500 m^2
+2048449500/4046.86 # 4046.86 m2/acre = 506182.4 acres
+  # entire ARP = 1723619 acres (calculated from ARP_vect polygon in Part1A_2)
+(506182.4/1723619)*100 # 29.36742 % of ARP (same as value=615 above)
 
 ## viz ----
 plot(ARP_priority_rast, col = "darkgreen")
@@ -480,14 +470,14 @@ ARP_priority_rast <- rast("ARP_priority_rast.tif")
 
 # (5) make PCUs ----
 ## patches ----
-# btw this line took 35 minutes to run
+# btw this line took 20 minutes to run
 
 priority_patches_all <- patches(ARP_priority_rast, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=FALSE)
-# there are 134187   patches
+# there are 93608 patches
 
 ## make polygons ----
 patch_all_polys <- as.polygons(priority_patches_all, values = FALSE)
-# there are 134187 geometries 
+# there are 93608 geometries 
 
 # add a patch_ID attribute for each poly
 patch_all_polys$patch_ID <- 1:nrow(patch_all_polys) 
@@ -498,20 +488,20 @@ patch_all_polys$patch_acres <- expanse(patch_all_polys) * 0.000247105
 
 # filt out small poys (< 20 acres)
 small_polys_removed <- patch_all_polys[patch_all_polys$patch_acres >= 20, ]
-# 1279 geoms remain
-(1279/134187)*100 # 0.9531475 % of polys remain (are >= 20 acres)
+# 1414 geoms remain
+(1414/134187)*100 # 1.053753 % of polys remain (are >= 20 acres)
   # so ~99 % of patches/polys were < 20 acres (isolated areas)
   # but many of these remaining polys are quite large and need to be divided
 
 # separate mid-sized polys (20-200 acres)
 mid_polys <- small_polys_removed[small_polys_removed$patch_acres <= 200, ]
-# 1062 geoms
-(1062/1279)*100 # 83.03362 % of polys >= 20 acres are also <= 200 acres
+# 1183 geoms
+(1183/1414)*100 # 83.66337 % of polys >= 20 acres are also <= 200 acres
   # these don't need to be divided
 
 # separate large polys ( > 200 acres)
 large_polys <- small_polys_removed[small_polys_removed$patch_acres > 200, ]
-# 217 geoms
+# 231 geoms
   # these do need to be divided
 
 ## divide ----
@@ -534,43 +524,48 @@ divided_polys_list <- lapply(1:nrow(large_polys), function(i) {
 
 # combine all divided polys into a single SpatVector
 divided_polys_vect <- do.call(rbind, divided_polys_list)
-  # 5366 geoms
+  # 2847 geoms
 
 # combine the mid-sized polys with the newly divided large polys
 ARP_PCUs_1A_vect <- rbind(mid_polys, divided_polys_vect)
-  # 6428 geoms
+  # 4030 geoms
 
-## adjust & stats ----
+## adjust ----
 
 # add new ID col & new final area col
-ARP_PCUs_1A_vect$PCU_ID <- 1:nrow(ARP_PCUs_vect)
-ARP_PCUs_1A_vect$area_acres <- expanse(ARP_PCUs_vect) * 0.000247105
+ARP_PCUs_1A_vect$PCU_ID <- 1:nrow(ARP_PCUs_1A_vect)
+ARP_PCUs_1A_vect$area_acres <- expanse(ARP_PCUs_1A_vect) * 0.000247105
 
 summary(ARP_PCUs_1A_vect)
-# area_acres min = 10.74, max = 347.78    
+# area_acres min = 16.78, max = 352.67  
+  # not exactly within the desired 20-200 acre range, but close enough
+    # this is a step in the method that we could refine in the future
 
 # select only new ID and area
 ARP_PCUs_1A_vect <- ARP_PCUs_1A_vect[, c("PCU_ID", "area_acres")]
 
 ARP_PCUs_1A_df <- as.data.frame(ARP_PCUs_1A_vect)
 
-sum(ARP_PCUs_1A_vect$area_acres) # 728204.8 acres
-sum(small_polys_removed$patch_acres) # 728204.8 acres
+sum(ARP_PCUs_1A_vect$area_acres) # 422214.1 acres
+sum(small_polys_removed$patch_acres) # 422214.1 acres
   # bc these are =, we know the divide function worked (retained all area)
 
-# ARP is 1723619 acres
-(728204.8/1723619)*100 # 42.24859 % of ARP are highest priority areas (PCUs)
+
+## stats ----
+# ARP is 1723619 acres 
+(422214.1/1723619)*100 # 24.49579 % of ARP are highest priority areas (PCUs)
 
 # for reference, 
-(832526.8/1723619)*100 # 48.30109 % of ARP meets basic priorities
-  # slope, road, risk, height, diameter
-(728204.8/832526.8)*100 # 87.46923 % of the areas that meet basic priorities
+(506182.4/1723619)*100 # 29.36742 % of ARP meets PFs (ARP_priority_rast values = 1)
+
+(422214.1/506182.4)*100 # 83.41145 % of the areas that meet basic priorities
   # are continuous PCUs > 20 acres
   
 
 ## viz ----
 plot(ARP_PCUs_1A_vect)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=1.5)
+
 
 ### write & read ----
 writeVector(ARP_PCUs_1A_vect, "ARP_PCUs_1A_vect.shp")
@@ -608,23 +603,23 @@ desired_ids <- c("RA20CPPLNT")
   # for our case study, we just want this single polygon with FACTS_ID = RA20CPPLNT
     # this is essentially all the Cameron Peak (CP) fire needs in 1 poly
 
-CP_sample_need_poly <- needs_all %>%
+CP_big_need_poly <- needs_all %>%
   select(all_of(desired_cols)) %>% 
   filter(FACTS_ID %in% desired_ids) 
 
-plot(CP_sample_need_poly)
+plot(CP_big_need_poly)
 
 ## project ---- 
-CP_sample_need_poly <- project(CP_sample_need_poly, "EPSG:5070")
+CP_big_need_poly <- project(CP_big_need_poly, "EPSG:5070")
 
 ## divide ----
 # calc area for entire polygon
-CP_sample_need_poly$area_all <- expanse(CP_sample_need_poly) * 0.000247105
+CP_big_need_poly$area_all <- expanse(CP_big_need_poly) * 0.000247105
   # 49637 acres
 49637/200 # 248 (rough number of parts)
 
 set.seed(100)
-CP_PPUs_vect <- divide(CP_sample_need_poly, n = 250)
+CP_PPUs_vect <- divide(CP_big_need_poly, n = 250)
   # 250 geoms
 
 # add ID 
@@ -638,34 +633,36 @@ summary(CP_PPUs_vect$area_acres)
 
 ## add Elv ----
 # using the DEM created in part 1A_3b
-ARP_DEM <- rast("ARP_DEM.tif")
+ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
 
 # the DEM is in meters --> convert m to ft
 meters_to_feet_factor <- 3.28084
-ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
-summary(ARP_DEM_ft) # min = 4839, max = 14227
+ARP_DEM_ft <- ARP_DEM_rast * meters_to_feet_factor 
+summary(ARP_DEM_ft) # min = 5374, max = 14030          
 
 # extract max
-Elv_max_df <- extract(ARP_DEM_ft, CL_PPUs_vect, fun=max)
+Elv_max_df <- extract(ARP_DEM_ft, CP_PPUs_vect, fun=max)
 str(Elv_max_df)
 # rename col
 Elv_max_df <- Elv_max_df %>% 
-  rename(PPU_ID = ID,
-         Elv_max_ft = USGS_1_n41w106_20230314)
+  rename(Elv_max_ft = USGS_1_n41w106_20230314) %>% 
+  mutate(PPU_ID = CP_PPUs_vect$PPU_ID) %>% 
+  select(-1)
 
 # extract min
-Elv_min_df <- extract(ARP_DEM_ft, CL_PPUs_vect, fun=min)
+Elv_min_df <- extract(ARP_DEM_ft, CP_PPUs_vect, fun=min)
 str(Elv_min_df)
 # rename col
 Elv_min_df <- Elv_min_df %>% 
-  rename(PPU_ID = ID,
-         Elv_min_ft = USGS_1_n41w106_20230314)
-
+  rename(Elv_min_ft = USGS_1_n41w106_20230314) %>% 
+  mutate(PPU_ID = CP_PPUs_vect$PPU_ID) %>% 
+  select(-1)
 
 Elv_join_df <- left_join(Elv_min_df, Elv_max_df, by = "PPU_ID")
 
 CP_PPUs_vect <- CP_PPUs_vect %>% 
   left_join(Elv_join_df, by = "PPU_ID")
+
 
 ### write & read ----
 writeVector(CP_PPUs_vect, "CP_PPUs_vect.shp")
@@ -673,12 +670,25 @@ CP_PPUs_vect <- vect("CP_PPUs_vect.shp")
 
 CP_PPUs_df <- as.data.frame(CP_PPUs_vect)
 
+CP_PPUs_vect <- CP_PPUs_vect %>% 
+  mutate(Elv_diff = Elv_max_ft - Elv_min_ft)
+
 ## select ----
   # for the case study, we are only going to use the planting needs (PPUs)
   # that are within the 9000 - 9500 ft EB
 CP_PPU_9000_9500_vect <- CP_PPUs_vect %>% 
   filter(Elv_min_ft >= 9000, Elv_max_ft <= 9500)
-# XX geoms
+# 1 geoms
+
+
+CP_PPU_8000_8500_vect <- CP_PPUs_vect %>% 
+  filter(Elv_min_ft >= 8000, Elv_max_ft <= 8500)
+# 0 geoms
+
+CP_PPU_8500_9000_vect <- CP_PPUs_vect %>% 
+  filter(Elv_min_ft >= 8500, Elv_max_ft <= 9000)
+# 0 geoms
+
 
 ### write & read ----
 writeVector(CP_PPU_9000_9500_vect, "CP_PPU_9000_9500_vect.shp")
@@ -686,6 +696,7 @@ CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
 
 sum(CP_PPU_9000_9500_vect$area_acres) # XX acres
 
+V2_CL_PPU_9000_9500_vect <- vect("V2_CL_PPU_9000_9500_vect.shp")
 
 
 
