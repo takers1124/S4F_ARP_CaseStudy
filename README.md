@@ -4,15 +4,19 @@ It is a work in progress and I will remove this line when it is completed.
 
 # Included files
 
-## S4F_ARP_CaseStudy_teaching.R
-This file is set up to teach part 1 of the workflow to others. The input_data can be downloaded from a google drive folder (instructions inside script). All input_data are pre-processed to streamline workflow, and the workflow stops after PCUs are created. For the full workflow, see S4F_ARP_CaseStudy_1.R
+## S4F_ARP_CaseStudy_1A.R
+Part_1A. Process raw data and create PCUs and PPUs for the case study.
 
-## S4F_ARP_CaseStudy_1.R
-This file is part 1 of the full analysis workflow. All raw data is processed to create PCUs and PPUs for the case study.
+## S4F_ARP_CaseStudy_1B.R
+Part_1B. Create and attach attributes to the ARP_PCUs.
 
 ## S4F_ARP_CaseStudy_2.R
-This file is part 2 of the workflow. It has the climate matching functions used to calculate climate match. 
+Part_2. Create climate matching functions and use to calculate climate match. 
 
-## S4F_ARP_CaseStudy_3_4.R
-This file is parts 3 and 4 of the workflow. Here we find which PCUs overlay with climate-matched areas for PPUs. We also see which PCUs overlay with current nursery inventory. 
+## S4F_ARP_CaseStudy_3.R
+Part_3. Overlay climate-matched areas for the case study PPUs to see site-specific PCUs. 
+And overlay nursery seedlots in the inventory with climate-matched areas. 
+
+## S4F_ARP_CaseStudy_4.R
+Part_4. Calculate and compare Existing Vegetation Type (EVT) for the different AOIs of the study. 
 
