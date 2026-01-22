@@ -12,8 +12,6 @@
 library(terra) 
 library(tidyterra) 
 library(dplyr)
-library(ggplot2) 
-
 
 # (2) create AOI ----
 
@@ -130,35 +128,28 @@ is.factor(EVH_ARP) # TRUE
 ### all treed area ----
   # EVH value = 101 = tree height 1 meter
   # EVH value = 201 = shrub height 0.01 meter
+
+# define conversion factor
+meters_to_feet_factor <- 3.28084
+
 ARP_EVH_rast <- ifel(
   EVH_ARP >= 101 & EVH_ARP < 200,
-  EVH_ARP, NA
-)
+  (EVH_ARP - 100) * meters_to_feet_factor, # if true, subtract 100 to get meters, then convert to feet
+  NA) # if false, make NA
 
 plot(ARP_EVH_rast)
 global(ARP_EVH_rast, fun = "notNA") # 5311714
+summary(ARP_EVH_rast) # min = 3.281, max = 82.021
 
 #### write & read ----
 writeRaster(ARP_EVH_rast, "ARP_EVH_rast.tif")
 ARP_EVH_rast <- rast("ARP_EVH_rast.tif")
 
 ### filter ----
-# define conversion factor
-meters_to_feet_factor <- 3.28084
-
-# reclassify with ifel()
 ARP_EVH_filt_rast <- ifel(
-  # condition 1: it is dominant veg type trees? (values 101-199)
-  EVH_ARP >= 101 & EVH_ARP < 200,
-  # if TRUE, 
-  # condition 2: is it > 10 ft tall? 
-  ifel(
-    (EVH_ARP - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
-    10, # if TRUE, reclassify to 10
-    NA # if FALSE, reclassify to NA
-  ),
-  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
-)
+  ARP_EVH_rast >= 10, 
+  10, # if at least 10 ft tall, make value = 10
+  NA) # if not, make NA
 
 ### viz ----
 plot(ARP_EVH_filt_rast, col = "forestgreen")
@@ -575,9 +566,9 @@ ARP_PCUs_1A_vect <- vect("ARP_PCUs_1A_vect.shp")
   # this is the case study PCU that we will use for FWD climate matching in part 2
   # the PCU closest to the Lady Moon trail head has PCU_ID = 212
 
-PCU_LM <- ARP_PCUs_1A_vect %>% 
-  filter(PCU_ID == 212)
-plot(PCU_LM)
+PCU_LM_vect <- ARP_PCUs_1A_vect %>% 
+  filter(PCU_ID == 204)
+plot(PCU_LM_vect)
 
 
 
@@ -607,29 +598,78 @@ CP_big_need_poly <- needs_all %>%
   select(all_of(desired_cols)) %>% 
   filter(FACTS_ID %in% desired_ids) 
 
-plot(CP_big_need_poly)
-
 ## project ---- 
 CP_big_need_poly <- project(CP_big_need_poly, "EPSG:5070")
+plot(CP_big_need_poly)
+  # has 1 geometry (one large multipart polygon)
+
+## disaggregate ----
+CP_disagg_need_poly <- disagg(CP_big_need_poly)
+  # has 362 geometries
+
+# add an ID col
+CP_disagg_need_poly$disagg_ID <- 1:nrow(CP_disagg_need_poly)
+
+## separate sizes ----
+# calc area (default in m^2) & convert to acres
+CP_disagg_need_poly$area_disagg <- expanse(CP_disagg_need_poly) * 0.000247105
+
+# filt out small poys (< 20 acres)
+small_polys_removed <- CP_disagg_need_poly[CP_disagg_need_poly$area_disagg >= 20, ]
+  # 112 geoms remain
+(112/362)*100 # 30.93923 % of polys remain (are >= 20 acres)
+
+# separate mid-sized polys (20-200 acres)
+mid_polys <- small_polys_removed[small_polys_removed$area_disagg <= 200, ]
+  # 85 geoms
+(85/362)*100 # 23.48066 % of polys >= 20 acres are also <= 200 acres
+  # these don't need to be divided
+
+# separate large polys ( > 200 acres)
+large_polys <- small_polys_removed[small_polys_removed$area_disagg > 200, ]
+  # 27 geoms
+  # these do need to be divided
 
 ## divide ----
-# calc area for entire polygon
-CP_big_need_poly$area_all <- expanse(CP_big_need_poly) * 0.000247105
-  # 49637 acres
-49637/200 # 248 (rough number of parts)
+# calculate divisions needed for each large poly, ensuring at least 2 parts for large polys
+num_all_parts <- pmax(2, round(large_polys$area_disagg / 125))
 
-set.seed(100)
-CP_PPUs_vect <- divide(CP_big_need_poly, n = 250)
-  # 250 geoms
+# use lapply to iterate and divide
+divided_polys_list <- lapply(1:nrow(large_polys), function(i) {
+  poly <- large_polys[i, ]
+  # set a seed to ensure reproducibility for the division process
+  set.seed(i)
+  # divide by the pre-determined number of parts for that particular poly
+  divided_poly <- divide(poly, n = num_all_parts[i])
+  # store the original ID and re-calculate the new areas
+  divided_poly$disagg_ID <- poly$disagg_ID
+  divided_poly$area_divided <- expanse(divided_poly) * 0.000247105
+  
+  return(divided_poly)
+})
 
-# add ID 
+# combine all divided polys into a single SpatVector
+divided_polys_vect <- do.call(rbind, divided_polys_list)
+  # 349 geoms
+
+# combine the mid-sized polys with the newly divided large polys
+CP_PPUs_vect <- rbind(mid_polys, divided_polys_vect)
+  # 434 geoms
+
+## adjust ----
+# add new ID col & new final area col
 CP_PPUs_vect$PPU_ID <- 1:nrow(CP_PPUs_vect)
-
-# new area of divided polys
 CP_PPUs_vect$area_acres <- expanse(CP_PPUs_vect) * 0.000247105
-summary(CP_PPUs_vect$area_acres)
-# min = 24.84    , max = 663.06  
 
+summary(CP_PPUs_vect$area_acres)
+  # min = 20.68, max = 203.97
+sum(CP_PPUs_vect$area_acres) # 49151.23 acres
+sum(small_polys_removed$area_disagg) # 49151.23 acres
+  # bc these are =, we know the divide function worked (retained all area)
+
+# select only new ID and area
+CP_PPUs_vect <- CP_PPUs_vect[, c("PPU_ID", "area_acres")]
+plot(CP_PPUs_vect)
 
 ## add Elv ----
 # using the DEM created in part 1A_3b
@@ -638,66 +678,46 @@ ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
 # the DEM is in meters --> convert m to ft
 meters_to_feet_factor <- 3.28084
 ARP_DEM_ft <- ARP_DEM_rast * meters_to_feet_factor 
-summary(ARP_DEM_ft) # min = 5374, max = 14030          
+summary(ARP_DEM_ft) # min = 5374, max = 14030   
 
-# extract max
-Elv_max_df <- extract(ARP_DEM_ft, CP_PPUs_vect, fun=max)
-str(Elv_max_df)
+# extract median
+Elv_med_df <- extract(ARP_DEM_ft, CP_PPUs_vect, fun=median)
+str(Elv_med_df)
 # rename col
-Elv_max_df <- Elv_max_df %>% 
-  rename(Elv_max_ft = USGS_1_n41w106_20230314) %>% 
+Elv_med_df <- Elv_med_df %>% 
+  rename(Elv_med_ft = USGS_1_n41w106_20230314) %>% 
   mutate(PPU_ID = CP_PPUs_vect$PPU_ID) %>% 
   select(-1)
 
-# extract min
-Elv_min_df <- extract(ARP_DEM_ft, CP_PPUs_vect, fun=min)
-str(Elv_min_df)
-# rename col
-Elv_min_df <- Elv_min_df %>% 
-  rename(Elv_min_ft = USGS_1_n41w106_20230314) %>% 
-  mutate(PPU_ID = CP_PPUs_vect$PPU_ID) %>% 
-  select(-1)
-
-Elv_join_df <- left_join(Elv_min_df, Elv_max_df, by = "PPU_ID")
-
+# add to spatvector
 CP_PPUs_vect <- CP_PPUs_vect %>% 
-  left_join(Elv_join_df, by = "PPU_ID")
-
+  left_join(Elv_med_df, by = "PPU_ID")
 
 ### write & read ----
 writeVector(CP_PPUs_vect, "CP_PPUs_vect.shp")
 CP_PPUs_vect <- vect("CP_PPUs_vect.shp")
 
-CP_PPUs_df <- as.data.frame(CP_PPUs_vect)
-
-CP_PPUs_vect <- CP_PPUs_vect %>% 
-  mutate(Elv_diff = Elv_max_ft - Elv_min_ft)
 
 ## select ----
   # for the case study, we are only going to use the planting needs (PPUs)
   # that are within the 9000 - 9500 ft EB
 CP_PPU_9000_9500_vect <- CP_PPUs_vect %>% 
-  filter(Elv_min_ft >= 9000, Elv_max_ft <= 9500)
-# 1 geoms
+  filter(Elv_med_ft >= 9000, Elv_med_ft <= 9500)
+  # 86 geoms
+  # too many for the case study - pick a subset of spatially close polys
+    # using Arc to visualize and choose (this is subjective)
 
+CaseStudy_PPUs <- c("223", "225", "232", "235", "239", "281", "282", "283", "286", "287", "288")
 
-CP_PPU_8000_8500_vect <- CP_PPUs_vect %>% 
-  filter(Elv_min_ft >= 8000, Elv_max_ft <= 8500)
-# 0 geoms
+CP_PPUs_CaseStudy_vect <- CP_PPUs_vect %>% 
+  filter(PPU_ID %in% CaseStudy_PPUs)
+  # 11 geoms
 
-CP_PPU_8500_9000_vect <- CP_PPUs_vect %>% 
-  filter(Elv_min_ft >= 8500, Elv_max_ft <= 9000)
-# 0 geoms
-
-
+sum(CP_PPUs_CaseStudy_vect$area_acres) # 1396.302 acres
+         
 ### write & read ----
-writeVector(CP_PPU_9000_9500_vect, "CP_PPU_9000_9500_vect.shp")
-CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
-
-sum(CP_PPU_9000_9500_vect$area_acres) # XX acres
-
-V2_CL_PPU_9000_9500_vect <- vect("V2_CL_PPU_9000_9500_vect.shp")
-
+writeVector(CP_PPUs_CaseStudy_vect, "CP_PPUs_CaseStudy_vect.shp")
+CP_PPUs_CaseStudy_vect <- vect("CP_PPUs_CaseStudy_vect.shp")
 
 
 
