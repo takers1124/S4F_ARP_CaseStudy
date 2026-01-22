@@ -13,15 +13,14 @@ library(terra)
 library(tidyterra) 
 library(dplyr)
 
-# load spatial data
+# read AOIs
 ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
 
-# PCU SpatVector created in Part 1A
+# read PCU SpatVector created in Part 1A
 ARP_PCUs_1A_vect <- vect("ARP_PCUs_1A_vect.shp")
   # only has PCU_ID and area_acres as attributes
   # this Part 1B script will add all the general attributes to it
-
 
 ## (A) risk data integration ----
 # using the crown fire probability (CFP) dataset from Pyrologix 
@@ -46,8 +45,7 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=2)
 
 ### stats ----
 global(ARP_CFP_rast, fun = "notNA") # 7776004 cells 
-sum(ARP_CFP_rast[] >= 0, na.rm = TRUE) # 7776004 cells
-# this dataset covers 100% of the ARP  
+  # this dataset covers 100% of the ARP  
 
 ### write & read file ----
 writeRaster(ARP_CFP_rast, "ARP_CFP_rast.tif")
@@ -72,15 +70,11 @@ b_seed <- read.csv("20230707_besseylots_editedlatlongs.csv") %>%
   mutate(lat_2 = ifelse(is.na(alt_lat), LAT, alt_lat), long_2 = ifelse(is.na(alt_long), LONG, alt_long)) %>% 
   mutate(long_2 = ifelse(long_2>0, long_2*-1, long_2))
 
-str(b_seed)
-
 lp_seed <- read.csv("LuckyPeak_inventory_2022_editedlatlongs.csv") %>% 
   rename(species=SP.Name) %>% 
   mutate(nursery = "lp_seed") %>% 
   mutate(lat_2 = ifelse(is.na(alt_lat), Lat, alt_lat), long_2 = ifelse(is.na(alt_long), Long, alt_long)) %>% 
   mutate(long_2 = ifelse(long_2>0, long_2*-1, long_2))
-
-str(lp_seed)
 
 cda_seed <- read.csv("CdA_inventory_2023_editedlatlongs.csv") %>% 
   rename(species = COMMON.NAME) %>% 
@@ -94,15 +88,8 @@ cda_seed <- read.csv("CdA_inventory_2023_editedlatlongs.csv") %>%
   mutate(lat_2 = ifelse(is.na(alt_lat), LAT, alt_lat), long_2 = ifelse(is.na(alt_long), LONG, alt_long)) %>% 
   mutate(long_2 = ifelse(long_2>0, long_2*-1, long_2))
 
-# investigate
-head(cda_seed)
-cda_spp <- unique(cda_seed$species)
-
-cda_seed %>% arrange(species) %>% View()
-
 ### combine ----
 # added long, lat, and seed to select()
-
 seed.nums.all<- 
   bind_rows(
     b_seed %>% 
@@ -148,13 +135,12 @@ conifer_seed_all <- seed.nums.all %>%
                                  "two-needle pinyon pine", "Arizona pine",
                                  "blue spruce", "bristlecone pine",
                                  "Great Basin bristlecone pine", "western white pine"))
-# has 1715 rows (seedlots)
+  # has 1715 rows (seedlots)
 
 # filter only seedots that have lat/long info
 conifer_seed <- conifer_seed_all %>% 
   filter(!is.na(lat_2), !is.na(long_2))
-# 1296 rows
-
+  # 1296 rows
 (1296/1715)*100 # 75.6 % of seedlots have coords
 
 # add ID col
@@ -177,8 +163,7 @@ conifer_seed_coords <- conifer_seed %>%
   ) %>% 
   select(-temp_lat)
 
-### convert to spatvector ----
-
+### convert to points ----
 seed_points <- vect(x = conifer_seed_coords, geom = c("long_2", "lat_2"), crs = "epsg:4326")
 plot(seed_points)
 
@@ -192,7 +177,7 @@ seed_points_vect <- vect("seed_points_vect.shp")
 
 seed_points_df <- as.data.frame(seed_points_vect)
 
-
+### convert to polys ----
 # make a circular buffer poly with 500 m width
 seed_poly_vect <- buffer(seed_points_vect, width = 500)
 plot(seed_poly_vect)
@@ -214,8 +199,9 @@ seed_SRME_vect <- seed_poly_vect %>%
 # has 158 geoms 
 (158/1296)*100 # = 12.19136 % of seedlot polys are within the SRME
 
-# simplify for relating
-# seed_SRME_simp <- simplifyGeom(seed_SRME_vect, tolerance = 50) # 50 meters
+#### write & read ----
+writeVector(seed_SRME_vect, "seed_SRME_vect.shp")
+seed_SRME_vect <- vect("seed_SRME_vect.shp")
 
 
 
@@ -223,7 +209,6 @@ seed_SRME_vect <- seed_poly_vect %>%
 # in this step, we add attributes (metadata) to our PCU polygons
 # this is how we further filter & select PCUs for scouting
 # we will divide the attributes into 4 groups (A-D)
-
 
 ## (A) attributes: geographic info ----
 # these attributes were not used to create PCUs
@@ -241,6 +226,7 @@ str(SL_relate) # a list of vectors (one per PCU) with intersecting pairs
 # adjust data
 rel_df <- as.data.frame(SL_relate)
 colnames(rel_df) <- c("pcu_idx", "seed_idx")
+str(rel_df)
 
 # compute per-PCU hit order
 rel_df <- rel_df %>%
@@ -257,13 +243,18 @@ second_hit <- filter(rel_df, hit == 2)
 SL_A <- rep(NA_character_, nrow(ARP_PCUs_1A_vect))
 SL_B <- rep(NA_character_, nrow(ARP_PCUs_1A_vect))
 
-# assign seedlot names by index
+# assign seedlot names (Lot attribute) by index
 SL_A[first_hit$pcu_idx]  <- seed_poly_vect$Lot[first_hit$seed_idx]
 SL_B[second_hit$pcu_idx] <- seed_poly_vect$Lot[second_hit$seed_idx]
 
 # attach attributes
 ARP_PCUs_1A_vect$seedlot_A <- SL_A
 ARP_PCUs_1A_vect$seedlot_B <- SL_B
+
+# stats
+count_non_na <- sum(!is.na(ARP_PCUs_1A_vect$seedlot_A))
+  # 32 PCUs overlap with at least 1 seedlot
+
 
 
 ### ranger district ----
@@ -280,7 +271,7 @@ RDs <- ranger_districts %>%
 PCU_centroids <- centroids(ARP_PCUs_1A_vect)
 
 # extract RDs at centroids
-RD_at_centroid <- extract(RDs, PCU_centroids, na.rm = TRUE)
+RD_at_centroid <- extract(RDs, PCU_centroids)
 
 # add attributes 
 ARP_PCUs_1A_vect$FORESTNAME <- RD_at_centroid$FORESTNAME 
@@ -288,12 +279,12 @@ ARP_PCUs_1A_vect$DISTRICTNA <- RD_at_centroid$DISTRICTNA
 
 
 ### seed zone ----
-# this shapefiles came fom Katie
+# this shapefile came fom Katie
 CO_SZ <- vect("Colo_Seed_Zones.shp")
 CO_SZ <- project(CO_SZ, "EPSG:5070")
 
 # extract
-extract_SZ <- extract(CO_SZ, PCU_centroids, na.rm = TRUE)
+extract_SZ <- extract(CO_SZ, PCU_centroids)
 str(extract_SZ)
 
 # add attributes 
@@ -303,28 +294,20 @@ ARP_PCUs_1A_vect$seed_zone <- extract_SZ$ZONE_NO
 ### elevation ----
 # using ARP_DEM created in Part1A_3b
 ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
+summary(ARP_DEM_rast) # min = 1638, max = 4276
 
 # the DEM is in meters, but we want ft
 # convert m to ft
 meters_to_feet_factor <- 3.28084
-ARP_DEM_ft <- ARP_DEM * meters_to_feet_factor 
-summary(ARP_DEM_ft) # min = 4839, max = 14227 
+ARP_DEM_ft <- ARP_DEM_rast * meters_to_feet_factor 
+summary(ARP_DEM_ft) # min = 5374, max = 14030  
 
-# extract max
-Elv_max_df <- extract(ARP_DEM_ft, ARP_PCUs_1A_vect, fun=max, na.rm = TRUE)
-str(Elv_max_df)
+# extract median
+Elv_med_df <- extract(ARP_DEM_ft, ARP_PCUs_1A_vect, fun=median)
+str(Elv_med_df)
 # rename col
-Elv_max_df <- Elv_max_df %>% 
-  rename(Elv_max_ft = USGS_1_n41w106_20230314) %>% 
-  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
-  select(-1)
-
-# extract min
-Elv_min_df <- extract(ARP_DEM_ft, ARP_PCUs_1A_vect, fun=min, na.rm = TRUE)
-str(Elv_min_df)
-# adjust
-Elv_min_df <- Elv_min_df %>% 
-  rename(Elv_min_ft = USGS_1_n41w106_20230314) %>% 
+Elv_med_df <- Elv_med_df %>% 
+  rename(Elv_med_ft = USGS_1_n41w106_20230314) %>% 
   mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
   select(-1)
 
@@ -332,17 +315,17 @@ Elv_min_df <- Elv_min_df %>%
 ## (B) attributes: thresholds for PCUs ----
 # these attributes were used to create PCUs 
 # we used them to set thresholds (e.g. only areas with QMD > 5 inches) in Part1A_3
-# here we will just extract the mean value for the metric across each PCU polygon
+# here we will just extract the median value for the metric across each PCU polygon
 
 ### QMD ----
 ARP_QMD_rast <- rast("ARP_QMD_rast.tif")
 
 # extract value
-extract_QMD <- extract(ARP_QMD_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+extract_QMD <- extract(ARP_QMD_rast, ARP_PCUs_1A_vect, fun = median, na.rm = TRUE)
 str(extract_QMD)
 # adjust
 extract_QMD <- extract_QMD %>% 
-  rename(QMD_in = CLASSNAMES) %>% 
+  rename(QMD_in = TreeMap2022_CONUS_QMD) %>% 
   mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
   select(-1)
 
@@ -351,7 +334,7 @@ extract_QMD <- extract_QMD %>%
 ARP_EVH_rast <- rast("ARP_EVH_rast.tif")
 
 # extract value
-extract_EVH <- extract(ARP_EVH_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+extract_EVH <- extract(ARP_EVH_rast, ARP_PCUs_1A_vect, fun = median, na.rm = TRUE)
 str(extract_EVH)
 # adjust
 extract_EVH <- extract_EVH %>% 
@@ -363,7 +346,7 @@ extract_EVH <- extract_EVH %>%
 ### slope ----
 ARP_slope_rast <- rast("ARP_slope_rast.tif")
 
-extract_slope <- extract(ARP_slope_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+extract_slope <- extract(ARP_slope_rast, ARP_PCUs_1A_vect, fun = median, na.rm = TRUE)
 str(extract_slope)
 # adjust
 extract_slope <- extract_slope %>% 
@@ -375,7 +358,7 @@ extract_slope <- extract_slope %>%
 ### road ----
 ARP_road_dist_rast <- rast("ARP_road_dist_rast.tif")
 
-extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+extract_road_dist <- extract(ARP_road_dist_rast, ARP_PCUs_1A_vect, fun = median, na.rm = TRUE)
 str(extract_road_dist)
 # adjust
 extract_road_dist <- extract_road_dist %>% 
@@ -385,23 +368,48 @@ extract_road_dist <- extract_road_dist %>%
   select(-1)
 
 
-
-
-
-
 ## (C) attributes: other objectives ----
 # these attributes are added to the PCU as a tool for objective-focused filtering
 
 
 ### CFP ----
-# using crown fire probability data from Part1B_1A (setup)
+# load & process
+CFP_49_41 <- rast("crown_fire_2025_c00049_r00041.tif")
+CFP_50_41 <- rast("crown_fire_2025_c00050_r00041.tif")
+CFP_50_40 <- rast("crown_fire_2025_c00050_r00040.tif")
+  # CRS already in 5070
+# combine
+CFP_mosaic <- mosaic(CFP_49_41, CFP_50_41, CFP_50_40, fun = "first")
+plot(CFP_mosaic)
+# crop & mask
+ARP_CFP_rast <- crop(CFP_mosaic, ARP_vect, mask=TRUE)
+plot(ARP_CFP_rast)
+
+#### write & read ----
+writeRaster(ARP_CFP_rast, "ARP_CFP_rast.tif")
 ARP_CFP_rast <- rast("ARP_CFP_rast.tif")
 
-extract_CFP <- extract(ARP_risk_score_rast, ARP_PCUs_1A_vect, fun=mean, na.rm = TRUE)
+# extract
+extract_CFP <- extract(ARP_CFP_rast, ARP_PCUs_1A_vect, fun = median, na.rm = TRUE)
 str(extract_CFP)
 # adjust
 extract_CFP <- extract_CFP %>% 
-  rename(CFP_prob = CLASSNAMES) %>% # may need to change CLASSNAMES!!!!
+  rename(CFP_prob = crown_fire_2025_c00049_r00041) %>% 
+  mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
+  select(-1)
+
+
+### BALIVE ----
+# read 
+BA_CONUS <- rast("TreeMap2022_CONUS_BALIVE.tif") # already in EPSG: 5070
+# crop & mask 
+ARP_BA_rast <- crop(BA_CONUS, ARP_vect, mask = TRUE)
+# extract
+extract_BA <- extract(ARP_BA_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
+str(extract_BA)
+# adjust
+extract_BA <- extract_BA %>% 
+  rename(BA_ft_sq = TreeMap2022_CONUS_BALIVE) %>% 
   mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
   select(-1)
 
@@ -414,10 +422,14 @@ crs(PIPO_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_versi
 PIPO_projected <- project(PIPO_BigMap, "EPSG:5070")
 crs(PIPO_projected) # EPSG 5070
 # crop & mask
-PIPO_ARP <- crop(PIPO_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PiPo_ARP)
+ARP_PIPO_rast <- crop(PIPO_projected, ARP_vect, mask=TRUE, touches=TRUE)
+
+#### write & read ----
+writeRaster(ARP_PIPO_rast, "ARP_PIPO_rast.tif")
+ARP_PIPO_rast <- rast("ARP_PIPO_rast.tif")
+
 # extract
-extract_PIPO <- extract(PIPO_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+extract_PIPO <- extract(ARP_PIPO_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
 str(extract_PIPO)
 # adjust
 extract_PIPO <- extract_PIPO %>% 
@@ -434,10 +446,14 @@ crs(PIEN_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_versi
 PIEN_projected <- project(PIEN_BigMap, "EPSG:5070")
 crs(PIEN_projected) # EPSG 5070
 # crop & mask
-PIEN_ARP <- crop(PIEN_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PIEN_ARP)
+ARP_PIEN_rast <- crop(PIEN_projected, ARP_vect, mask=TRUE, touches=TRUE)
+
+#### write & read ----
+writeRaster(ARP_PIEN_rast, "ARP_PIEN_rast.tif")
+ARP_PIEN_rast <- rast("ARP_PIEN_rast.tif")
+
 # extract
-extract_PIEN <- extract(PIEN_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+extract_PIEN <- extract(ARP_PIEN_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
 str(extract_PIEN)
 # adjust
 extract_PIEN <- extract_PIEN %>% 
@@ -454,14 +470,18 @@ crs(PIFL_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_versi
 PIFL_projected <- project(PIFL_BigMap, "EPSG:5070")
 crs(PIFL_projected) # EPSG 5070
 # crop & mask
-PIFL_ARP <- crop(PIFL_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PIFL_ARP)
+ARP_PIFL_rast <- crop(PIFL_projected, ARP_vect, mask=TRUE, touches=TRUE)
+
+#### write & read ----
+writeRaster(ARP_PIFL_rast, "ARP_PIFL_rast.tif")
+ARP_PIFL_rast <- rast("ARP_PIFL_rast.tif")
+
 # extract
-extract_PIFL <- extract(PIFL_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+extract_PIFL <- extract(ARP_PIFL_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
 str(extract_PIFL)
 # adjust
 extract_PIFL <- extract_PIFL %>% 
-  rename(PIFL2_tons = Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457) %>% 
+  rename(PIFL_tons = Hosted_AGB_0113_2018_LIMBER_PINE_05292023073457) %>% 
   mutate(PCU_ID = ARP_PCUs_1A_vect$PCU_ID) %>% 
   select(-1)
 
@@ -474,10 +494,14 @@ crs(PICO_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_versi
 PICO_projected <- project(PICO_BigMap, "EPSG:5070")
 crs(PICO_projected) # EPSG 5070
 # crop & mask
-PICO_ARP <- crop(PICO_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PICO_ARP)
+ARP_PICO_rast <- crop(PICO_projected, ARP_vect, mask=TRUE, touches=TRUE)
+
+#### write & read ----
+writeRaster(ARP_PICO_rast, "ARP_PICO_rast.tif")
+ARP_PICO_rast <- rast("ARP_PICO_rast.tif")
+
 # extract
-extract_PICO <- extract(PICO_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+extract_PICO <- extract(ARP_PICO_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
 str(extract_PICO)
 # adjust
 extract_PICO <- extract_PICO %>% 
@@ -494,10 +518,14 @@ crs(PSME_BigMap) # EPSG 9001 - USA_Contiguous_Albers_Equal_Area_Conic_USGS_versi
 PSME_projected <- project(PSME_BigMap, "EPSG:5070")
 crs(PSME_projected) # EPSG 5070
 # crop & mask
-PSME_ARP <- crop(PSME_projected, ARP_vect, mask=TRUE, touches=TRUE)
-plot(PSME_ARP)
+ARP_PSME_rast <- crop(PSME_projected, ARP_vect, mask=TRUE, touches=TRUE)
+
+#### write & read ----
+writeRaster(ARP_PSME_rast, "ARP_PSME_rast.tif")
+ARP_PSME_rast <- rast("ARP_PSME_rast.tif")
+
 # extract
-extract_PSME <- extract(PSME_ARP, ARP_PCUs_1A_vect, fun=mean, na.rm=TRUE)
+extract_PSME <- extract(ARP_PSME_rast, ARP_PCUs_1A_vect, fun = median, na.rm=TRUE)
 str(extract_PSME)
 # adjust
 extract_PSME <- extract_PSME %>% 
@@ -515,14 +543,15 @@ extract_PSME <- extract_PSME %>%
 # (3) combine ----
 ARP_PCUs_1A_vect # has PCU_ID, area_acres, seedlot_A, seedlot_B, FORESTNAME, DISTRICTNA, seed_zone
   # we added these one at a time (because they came from SpatVectors)
+
 # now add the others
-match_join_df <- Elv_max_df %>% 
-  left_join(Elv_min_df, by = "PCU_ID") %>% 
+match_join_df <- Elv_med_df %>% 
   left_join(extract_EVH, by = "PCU_ID") %>% 
   left_join(extract_QMD, by = "PCU_ID") %>% 
   left_join(extract_slope, by = "PCU_ID") %>% 
   left_join(extract_road_dist, by = "PCU_ID") %>% 
   left_join(extract_CFP, by = "PCU_ID") %>% 
+  left_join(extract_BA, by = "PCU_ID") %>% 
   left_join(extract_PIPO, by = "PCU_ID") %>% 
   left_join(extract_PIEN, by = "PCU_ID") %>% 
   left_join(extract_PIFL, by = "PCU_ID") %>% 
@@ -540,25 +569,3 @@ write.csv(ARP_PCUs_df, "ARP_PCUs_df.csv", row.names = FALSE)
 writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
 ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 
-
-## can remove later ----
-# previous way to add
-# attributes to add
-# attribute_list <- list(Elv_max_df, Elv_min_df, 
-#                        extract_EVH, extract_QMD,
-#                        extract_slope, 
-#                        extract_road_dist,
-#                        extract_CFP,
-#                        extract_PIPO, extract_PIEN, extract_PIFL, extract_PICO, extract_PSME)
-# str(attribute_list)
-# 
-# # change "ID" to "PCU_ID" in attribute_list
-# renamed_list <- lapply(attribute_list, function(df) {
-#   df %>% rename(PCU_ID = ID)
-# })
-# str(renamed_list)
-# 
-# attributes_combined_df <- Reduce(function(x, y) full_join(x, y, by = "PCU_ID"), renamed_list)
-# 
-# ARP_PCUs_atts_vect <- ARP_PCUs_vect %>% 
-#   left_join(attributes_combined_df, by = "PCU_ID")
