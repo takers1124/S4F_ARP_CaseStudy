@@ -40,7 +40,7 @@ library(dplyr)
 ### ref ----
 #### ARP ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ref_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2_V1/PPU_9000_9500/ref_match_ARP_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -286,6 +286,77 @@ ref_match_df2 <- ref_match_df %>%
   mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE),
          PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
   select(-1)
+
+
+
+##### test 1 ----
+# (0) confirm names
+names(PPU_ref_match_ARP_rast) # each is "ref_U_100" with the PPU_ID number
+
+# (1) extract the presence of a match for each layer (one for each PPU polygon), per PCU polygon
+  # set a custom function which makes the columns int not num
+presence_fun <- function(x) as.integer(any(!is.na(x)))
+  # x = vector of all pixel values of the raster layer that fall within the polygon
+  # !is.na(x) turns that vector into logicals: TRUE for every pixel that is not NA, FALSE for NAs
+  # any() returns TRUE if at least one pixel within that polygon-layer is not NA
+  # as.integer() converts TRUE -> 1 and FLASE -> 0
+    # so we can still use rowSums to get the total number of PPU layers that are matching
+
+ref_match_df <- extract(PPU_ref_match_ARP_rast, ARP_PCUs_vect, fun = presence_fun)
+str(ref_match_df)
+  # rows = PCU polys
+  # cols = raster layers (which correspond to PPU polys)
+
+# (2) drop the auto-generated extract ID column
+  # I would name this object something different next time... 
+presence_mat <- ref_match_df[ , -1, drop = FALSE]
+
+# (3) create 2 attributes
+ref_sum <- rowSums(presence_mat, na.rm = TRUE)
+
+  # build per-row list of matching PPU_IDs using layer names
+ref_matches <- apply(presence_mat, 1, function(row) { 
+    # apply() iterates row-wise because of the 1
+    # for each row (one PCU poly), it passes a vector row containing the values across all PPU layers
+  
+  ids <- names(presence_mat)[which(row ==1)]
+    # finds the indices of layers where polygon has a match (value 1)
+      # which() returns integer positions of TRUEs
+      # if row may contain NA, consider: which(!is.na(row) & row ==1)
+    # names() uses those indices to select the column names from presence_mat
+      # these names are the PPU_IDs in abbreviated form and match the raster layer names
+      # could also use colnames()
+    # if these are no matches (index vector is length 0), ids becomes character(0)
+    # ids becomes a character vector 
+  
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+    # if else; conditional expression, returns TRUE or FALSE
+    # lengths(ids) == 0; 
+      # lengths() gives the number of elements in the ids vector
+      # == 0 means there were no matches for the polygon (the vector is empty)
+    # if there were no 1s in the row, return NA
+    # otherwise, join all matching PPU_IDs into a single comma-separated string
+      # this string is the compact attribute we want to add to the spatvector for which layers of the raster are matching
+      # paste(); if there are matches (lengths(ids) >0), 
+        # this takes all the PPU_IDs in ids and combines them into a single string, separated by commas
+    
+    # apply() collects the return from each row's function into a character vector ref_matches, with one element per PCU poly
+})
+
+# (4) make new df
+ref_match_df2 <- tibble(
+  PCU_ID =  ARP_PCUs_vect$PCU_ID,
+  ref_sum = ref_sum,
+  ref_matches = ref_matches
+)
+
+# (5) attach to PCu_vect
+ARP_PCUs_vect2 <- cbind(ARP_PCUs_vect, ref_match_df2[ , c("ref_sum", "ref_matches")])
+
+ARP_PCUs_df2 <- as.data.frame(ARP_PCUs_vect2)
+  # this worked! 
+
+
 
 #### curr ----
 # extract max "match value" across match_rast raster layers for each PCU
