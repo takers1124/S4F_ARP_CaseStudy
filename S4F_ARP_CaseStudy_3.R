@@ -40,7 +40,7 @@ library(dplyr)
 ### ref ----
 #### ARP ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2_V1/PPU_9000_9500/ref_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ref_match_ARP_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -51,8 +51,7 @@ PPU_ref_match_ARP_rast <- rast(rast_files)
 
 # sum rast values across all layers
 PPU_ref_match_sum_ARP_rast <- app(PPU_ref_match_ARP_rast, fun = "sum", na.rm = TRUE)
-# values range from 1 to 19,
-# so only 19 of the 20 PPUs in this EB have overlapping climate match areas
+# max value = 15
 
 plot(PPU_ref_match_sum_ARP_rast)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
@@ -62,16 +61,17 @@ writeRaster(PPU_ref_match_sum_ARP_rast, "PPU_ref_match_sum_ARP_rast.tif")
 PPU_ref_match_sum_ARP_rast <- rast("PPU_ref_match_sum_ARP_rast.tif")
 
 ##### stats ----
-global(PPU_ref_match_sum_ARP_rast, fun = "notNA") # 2799 cells
+global(PPU_ref_match_sum_ARP_rast, fun = "notNA") # 2910 cells
 global(ref_ARP_rast, fun = "notNA") # 6937 cells in all ARP
   # the climate match rasters (1000x1000 m) are not the same resolution as other raster data in part 1 (30x30 m)
-(2799/6937)*100 # = 40.34885 % of ARP is climate matched with at least 1 PPU
+    # so using the ref_ARP_rast here for total # cells
+(2910/6937)*100 # = 41.94897 % of ARP is climate matched with at least 1 PPU
 
 
 
 #### SRME ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ref_match_SRME_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ref_match_SRME_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -82,6 +82,7 @@ PPU_ref_match_SRME_rast <- rast(rast_files)
 
 # sum rast values across all layers
 PPU_ref_match_sum_SRME_rast <- app(PPU_ref_match_SRME_rast, fun = "sum", na.rm = TRUE)
+  # max value = 15
 
 plot(PPU_ref_match_sum_SRME_rast)
 polys(SRME_vect, col = "black", alpha=0.01, lwd=0.5)
@@ -91,16 +92,16 @@ writeRaster(PPU_ref_match_sum_SRME_rast, "PPU_ref_match_sum_SRME_rast.tif")
 PPU_ref_match_sum_SRME_rast <- rast("PPU_ref_match_sum_SRME_rast.tif")
 
 ##### stats ----
-global(PPU_ref_match_sum_SRME_rast, fun = "notNA") # 60636 cells
+global(PPU_ref_match_sum_SRME_rast, fun = "notNA") # 56678 cells
 global(ssp2_SRME_rast, fun = "notNA") # 134124 cells in all SRME
-(60636/134124)*100 # = 45.20891 % of SRME is climate matched with at least 1 PPU
+(56678/134124)*100 # = 42.25791 % of SRME is climate matched with at least 1 PPU
 
 
 
 ### curr ----
 #### ARP ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/curr_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/curr_match_ARP_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -120,13 +121,13 @@ writeRaster(PPU_curr_match_sum_ARP_rast, "PPU_curr_match_sum_ARP_rast.tif")
 PPU_curr_match_sum_ARP_rast <- rast("PPU_curr_match_sum_ARP_rast.tif")
 
 ##### stats ----
-global(PPU_curr_match_sum_ARP_rast, fun = "notNA") # 1930 cells
-(1930/6937)*100 # = 27.82182 % of ARP is climate matched with at least 1 PPU
+global(PPU_curr_match_sum_ARP_rast, fun = "notNA") # 1839 cells
+(1839/6937)*100 # = 26.51002 % of ARP is climate matched with at least 1 PPU
 
 
 #### SRME ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/curr_match_SRME_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/curr_match_SRME_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -146,14 +147,14 @@ writeRaster(PPU_curr_match_sum_SRME_rast, "PPU_curr_match_sum_SRME_rast.tif")
 PPU_curr_match_sum_SRME_rast <- rast("PPU_curr_match_sum_SRME_rast.tif")
 
 ##### stats ----
-global(PPU_curr_match_sum_SRME_rast, fun = "notNA") # 52547 cells
-(52547/134124)*100 # = 39.17792 % of SRME is climate matched with at least 1 PPU
+global(PPU_curr_match_sum_SRME_rast, fun = "notNA") # 53103 cells
+(53103/134124)*100 # = 39.59247 % of SRME is climate matched with at least 1 PPU
 
 
 ### ssp2 ----
 #### ARP ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ssp2_match_ARP_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -173,13 +174,13 @@ writeRaster(PPU_ssp2_match_sum_ARP_rast, "PPU_ssp2_match_sum_ARP_rast.tif")
 PPU_ssp2_match_sum_ARP_rast <- rast("PPU_ssp2_match_sum_ARP_rast.tif")
 
 ##### stats ----
-global(PPU_ssp2_match_sum_ARP_rast, fun = "notNA") # 1584 cells
-(1584/6937)*100 # = 22.83408 % of ARP is climate matched with at least 1 PPU
+global(PPU_ssp2_match_sum_ARP_rast, fun = "notNA") # 1753 cells
+(1753/6937)*100 # = 25.27029 % of ARP is climate matched with at least 1 PPU
 
 
 #### SRME ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp2_match_SRME_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ssp2_match_SRME_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -199,15 +200,15 @@ writeRaster(PPU_ssp2_match_sum_SRME_rast, "PPU_ssp2_match_sum_SRME_rast.tif")
 PPU_ssp2_match_sum_SRME_rast <- rast("PPU_ssp2_match_sum_SRME_rast.tif")
 
 ##### stats ----
-global(PPU_ssp2_match_sum_SRME_rast, fun = "notNA") # 33068 cells
-(33068/134124)*100 # = 24.6548 % of SRME is climate matched with at least 1 PPU
+global(PPU_ssp2_match_sum_SRME_rast, fun = "notNA") # 35018 cells
+(35018/134124)*100 # = 26.10868 % of SRME is climate matched with at least 1 PPU
 
 
 
 ### ssp5 ----
 #### ARP ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp5_match_ARP_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ssp5_match_ARP_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -227,13 +228,13 @@ writeRaster(PPU_ssp5_match_sum_ARP_rast, "PPU_ssp5_match_sum_ARP_rast.tif")
 PPU_ssp5_match_sum_ARP_rast <- rast("PPU_ssp5_match_sum_ARP_rast.tif")
 
 ##### stats ----
-global(PPU_ssp5_match_sum_ARP_rast, fun = "notNA") # 803 cells
-(803/6937)*100 # = 11.57561 % of ARP is climate matched with at least 1 PPU
+global(PPU_ssp5_match_sum_ARP_rast, fun = "notNA") # 973 cells
+(973/6937)*100 # = 14.02624 % of ARP is climate matched with at least 1 PPU
 
 
 #### SRME ----
 # set path to folder with all match_clim() output rasters
-target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/PPU_9000_9500/ssp5_match_SRME_ref"
+target_directory <- "C:/Users/TaylorAkers/Box/Seeds_for_the_future/R_projects_and_code/S4F_ARP_CaseStudy/output_data/tif_part2/REV_PPU_CS/ssp5_match_SRME_ref"
 setwd(target_directory)
 
 # create a list of raster files in folder 
@@ -253,8 +254,8 @@ writeRaster(PPU_ssp5_match_sum_SRME_rast, "PPU_ssp5_match_sum_SRME_rast.tif")
 PPU_ssp5_match_sum_SRME_rast <- rast("PPU_ssp5_match_sum_SRME_rast.tif")
 
 ##### stats ----
-global(PPU_ssp5_match_sum_SRME_rast, fun = "notNA") # 21550 cells
-(21550/134124)*100 # = 16.06722 % of SRME is climate matched with at least 1 PPU
+global(PPU_ssp5_match_sum_SRME_rast, fun = "notNA") # 23811 cells
+(23811/134124)*100 # = 17.75297 % of SRME is climate matched with at least 1 PPU
 
 
 
@@ -268,30 +269,18 @@ global(PPU_ssp5_match_sum_SRME_rast, fun = "notNA") # 21550 cells
     # we will average (extract the mean) # of matching PPUs   
     # and add this mean value as an attribute for each PCU, for each climate scenario
   
+### (a) read PCUs
 # using the PCU vector created in part 1
 ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 plot(ARP_PCUs_vect)
 
 # only using the 4 PPU_X_match_sum_ARP_rast (not the SRME too) because all PCUs are in the ARP
-  # so only need the sum extent that covers all PCUs
 
-### (a) extract ----
+
+### (b) extract ----
 #### ref ----
-# extract max "match value" across match_rast raster layers for each PCU
-ref_match_df <- extract(PPU_ref_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
-str(ref_match_df)
-
-# add sum and PCU_ID; remove auto-gen ID from extract()
-ref_match_df2 <- ref_match_df %>% 
-  mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
-  select(-1)
-
-
-
-##### test 1 ----
 # (0) confirm names
-names(PPU_ref_match_ARP_rast) # each is "ref_U_100" with the PPU_ID number
+names(PPU_ref_match_ARP_rast) # each is "ref_U_100" with the PPU_ID number, 1 PPU per layer
 
 # (1) extract the presence of a match for each layer (one for each PPU polygon), per PCU polygon
   # set a custom function which makes the columns int not num
@@ -309,17 +298,19 @@ str(ref_match_df)
 
 # (2) drop the auto-generated extract ID column
   # I would name this object something different next time... 
-presence_mat <- ref_match_df[ , -1, drop = FALSE]
+ref_match_df2 <- ref_match_df[ , -1, drop = FALSE]
+str(ref_match_df2)
 
 # (3) create 2 attributes
-ref_sum <- rowSums(presence_mat, na.rm = TRUE)
+ref_sum <- rowSums(ref_match_df2, na.rm = TRUE)
+  # get # of rows with value = 1 (TRUE), meaning the PCU poly could overlap with any # of PPU match rasters (0-18)
 
   # build per-row list of matching PPU_IDs using layer names
-ref_matches <- apply(presence_mat, 1, function(row) { 
+ref_matches <- apply(ref_match_df2, 1, function(row) { 
     # apply() iterates row-wise because of the 1
     # for each row (one PCU poly), it passes a vector row containing the values across all PPU layers
   
-  ids <- names(presence_mat)[which(row ==1)]
+  ids <- names(ref_match_df2)[which(row ==1)]
     # finds the indices of layers where polygon has a match (value 1)
       # which() returns integer positions of TRUEs
       # if row may contain NA, consider: which(!is.na(row) & row ==1)
@@ -350,115 +341,89 @@ ref_match_df2 <- tibble(
   ref_matches = ref_matches
 )
 
-# (5) attach to PCu_vect
-ARP_PCUs_vect2 <- cbind(ARP_PCUs_vect, ref_match_df2[ , c("ref_sum", "ref_matches")])
+# (5) attach to PCU_vect
+ARP_PCUs_CS_vect <- cbind(ARP_PCUs_vect, ref_match_df2[ , c("ref_sum", "ref_matches")])
 
-ARP_PCUs_df2 <- as.data.frame(ARP_PCUs_vect2)
+ARP_PCUs_CS_df <- as.data.frame(ARP_PCUs_CS_vect)
   # this worked! 
 
 
-
 #### curr ----
-# extract max "match value" across match_rast raster layers for each PCU
-curr_match_df <- extract(PPU_curr_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
+curr_match_df <- extract(PPU_curr_match_ARP_rast, ARP_PCUs_vect, fun = presence_fun)
+curr_match_df2 <- curr_match_df[ , -1, drop = FALSE]
+curr_sum <- rowSums(curr_match_df2, na.rm = TRUE)
+curr_matches <- apply(curr_match_df2, 1, function(row) { 
+  ids <- names(curr_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+curr_match_df2 <- tibble(
+  PCU_ID =  ARP_PCUs_vect$PCU_ID,
+  curr_sum = curr_sum,
+  curr_matches = curr_matches
+)
+ARP_PCUs_CS_vect <- cbind(ARP_PCUs_CS_vect, curr_match_df2[ , c("curr_sum", "curr_matches")])
 
-# rename, arrange, add rank
-curr_match_df2 <- curr_match_df %>% 
-  mutate(curr_sum = rowSums(curr_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
-  select(-1)
 
 #### ssp2 ----
-# extract max "match value" across match_rast raster layers for each PCU
-ssp2_match_df <- extract(PPU_ssp2_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
-
-# rename, arrange, add rank
-ssp2_match_df2 <- ssp2_match_df %>% 
-  mutate(ssp2_sum = rowSums(ssp2_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
-  select(-1)
+ssp2_match_df <- extract(PPU_ssp2_match_ARP_rast, ARP_PCUs_vect, fun = presence_fun)
+ssp2_match_df2 <- ssp2_match_df[ , -1, drop = FALSE]
+ssp2_sum <- rowSums(ssp2_match_df2, na.rm = TRUE)
+ssp2_matches <- apply(ssp2_match_df2, 1, function(row) { 
+  ids <- names(ssp2_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+ssp2_match_df2 <- tibble(
+  PCU_ID =  ARP_PCUs_vect$PCU_ID,
+  ssp2_sum = ssp2_sum,
+  ssp2_matches = ssp2_matches
+)
+ARP_PCUs_CS_vect <- cbind(ARP_PCUs_CS_vect, ssp2_match_df2[ , c("ssp2_sum", "ssp2_matches")])
 
 #### ssp5 ----
-# extract max "match value" across match_rast raster layers for each PCU
-ssp5_match_df <- extract(PPU_ssp5_match_ARP_rast, ARP_PCUs_vect, fun = max, na.rm = TRUE)
-
-# rename, arrange, add rank
-ssp5_match_df2 <- ssp5_match_df %>% 
-  mutate(ssp5_sum = rowSums(ssp5_match_df[,-1], na.rm = TRUE),
-         PCU_ID = ARP_PCUs_vect$PCU_ID) %>% 
-  select(-1)
-
-
-### (b) merge ----
-# combine all 3 dfs
-
-match_join_df <- ref_match_df2 %>% 
-  left_join(curr_match_df2, by = "PCU_ID") %>% 
-  left_join(ssp2_match_df2, by = "PCU_ID") %>% 
-  left_join(ssp5_match_df2, by = "PCU_ID")
-
-# merge with spatvector
-ARP_PCUs_matched_full_vect <- ARP_PCUs_vect %>% 
-  left_join(match_join_df, by = "PCU_ID")
-
-ARP_PCUs_matched_full_df <- as.data.frame(ARP_PCUs_matched_full_vect)
-str(ARP_PCUs_matched_full_df)
-
-#### write & read ----
-writeVector(ARP_PCUs_matched_full_vect, "ARP_PCUs_matched_full_vect.shp")
-ARP_PCUs_matched_full_vect <- vect("ARP_PCUs_matched_full_vect.shp")
-
-### (c) select ----
-ARP_PCUs_matched_vect <- ARP_PCUs_matched_full_vect %>% 
-  select(PCU_ID, area_acres, ref_sum, curr_sum, ssp2_sum, ssp5_sum)
-
-ARP_PCUs_matched_df <- as.data.frame(ARP_PCUs_matched_vect)
-
-#### write & read ----
-writeVector(ARP_PCUs_matched_vect, "ARP_PCUs_matched_vect.shp")
-ARP_PCUs_matched_vect <- vect("ARP_PCUs_matched_vect.shp")
+ssp5_match_df <- extract(PPU_ssp5_match_ARP_rast, ARP_PCUs_vect, fun = presence_fun)
+ssp5_match_df2 <- ssp5_match_df[ , -1, drop = FALSE]
+ssp5_sum <- rowSums(ssp5_match_df2, na.rm = TRUE)
+ssp5_matches <- apply(ssp5_match_df2, 1, function(row) { 
+  ids <- names(ssp5_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+ssp5_match_df2 <- tibble(
+  PCU_ID =  ARP_PCUs_vect$PCU_ID,
+  ssp5_sum = ssp5_sum,
+  ssp5_matches = ssp5_matches
+)
+ARP_PCUs_CS_vect <- cbind(ARP_PCUs_CS_vect, ssp5_match_df2[ , c("ssp5_sum", "ssp5_matches")])
 
 
-### (d) filter ----
-#### *** need to re-run ----
+##### write & read ----
+writeVector(ARP_PCUs_CS_vect, "ARP_PCUs_CS_vect.shp")
+ARP_PCUs_CS_vect <- vect("ARP_PCUs_CS_vect.shp")
+
+ARP_PCUs_CS_df <- as.data.frame(ARP_PCUs_CS_vect)
+write.csv(ARP_PCUs_CS_df, "ARP_PCUs_CS_df.csv", row.names = FALSE)
+
+
+### (c) filter ----
 
 #### ssp2, 1 match----
-# filter only PCUs that are within climate-matched areas (have a match score >= 1)
-PCUs_matched_1_ssp2_vect <- ARP_PCUs_matched_vect %>%
+# filter only PCUs that are within future-climate-matched areas (have a match score >= 1 for spp2)
+PCUs_matched_ssp2_vect <- ARP_PCUs_CS_vect %>%
   filter(ssp2_sum >= 1)
 
 ##### stats ----
-# has 1679 geoms
-(1679/6428)*100 # 26.1201 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 1 PPU
+# has 1390 geoms
+(1390/6428)*100 # 21.62414 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 1 PPU
 
-sum(PCUs_matched_1_ssp2_vect$area_acres) # 186385.3 acres
+sum(PCUs_matched_ssp2_vect$area_acres) # 144477.6 acres
 # ARP is 1723619 acres
-(186385.3/1723619)*100 # 10.8136 % of area of ARP
+(144477.6/1723619)*100 # 8.382224 % of area of ARP
 
-plot(PCUs_matched_1_ssp2_vect)
+plot(PCUs_matched_ssp2_vect)
 polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 
-##### write & read ----
-writeVector(PCUs_matched_1_ssp2_vect, "PCUs_matched_1_ssp2_vect.shp")
-PCUs_matched_1_ssp2_vect <- vect("PCUs_matched_1_ssp2_vect.shp")
-
-
-#### ssp2, 10 matches ----
-# filter only PCUs that meet 1/2 of needs (have a match score >= 10)
-PCUs_matched_10_ssp2_vect <- ARP_PCUs_matched_vect %>%
-  filter(ssp2_sum >= 10)
-
-##### stats ----
-# has 441 geoms
-(441/6428)*100 # 6.86061 % of all the PCUs in the ARP are climate matched (under ssp2) with at least 10 PPUs (half of the 9000-9500 EB case study)
-
-sum(PCUs_matched_10_ssp2_vect$area_acres) # 42233.71 acres
-  # ARP is 1723619 acres
-(42233.71/1723619)*100 # 2.450293 % of ARP area
-
-##### write & read ----
-# writeVector(PCUs_matched_10_ssp2_vect, "PCUs_matched_10_ssp2_vect.shp")
-# PCUs_matched_10_ssp2_vect <- vect("PCUs_matched_10_ssp2_vect.shp")
+###### write & read ----
+writeVector(PCUs_matched_ssp2_vect, "PCUs_matched_ssp2_vect.shp")
+PCUs_matched_ssp2_vect <- vect("PCUs_matched_ssp2_vect.shp")
 
 
 
@@ -478,110 +443,103 @@ sum(PCUs_matched_10_ssp2_vect$area_acres) # 42233.71 acres
 # in paper fig., want to show (1) all SLs in SRME and (2) those matching (above)
   # but the SLs need to be points, bc the polys are so small, they don't show up on Arc when zoomed out to SRME
 
-### ** check final ----
-  # I altered the file name and SL_ID col in Part 1_B
-  # make sure runs smoothly below with changes
+
 
 ### (a) read SLs ----
 # created in Part 1_B
-seed_points_vect <- vect("seed_points_vect.shp")
-# has 1296 geoms & 14 attributes
+seed_SRME_vect <- vect("seed_SRME_vect.shp")
 
-seed_pts_df <- as.data.frame(seed_points_vect)
-
-# but want to filter for only those that are located within the SRME
-seed_within <- relate(seed_points_vect, SRME_vect, relation = "within")
-  # add as attribute to the spatvector
-seed_points_vect$within_SRME <- seed_within
-
-seed_SRME <- seed_points_vect %>% 
-  filter(within_SRME == "TRUE") %>% 
-  select(SL_ID, Lot, species, Year, Balance, name)
-# has 159 geoms 
-(159/1296)*100 # = 12.26852 % of seedlots are within the SRME
-# has one more than when use polys (probably the poly is on SRME boundary)
-  # not a problem for now
 
 ### (b) extract ----
 #### ref ----
-ref_match_df <- extract(PPU_ref_match_SRME_rast, seed_SRME)
-str(ref_match_df)
+# using same method for extraction as with the PCU overlay (Part 3-2)
+ref_match_df_sl <- extract(PPU_ref_match_SRME_rast, seed_SRME_vect, fun = presence_fun)
+ref_match_df2 <- ref_match_df_sl[ , -1, drop = FALSE]
+ref_sum <- rowSums(ref_match_df2, na.rm = TRUE)
+ref_matches <- apply(ref_match_df2, 1, function(row) { 
+  ids <- names(ref_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+ref_match_df2 <- tibble(
+  SL_ID =  seed_SRME_vect$SL_ID,
+  ref_sum = ref_sum,
+  ref_matches = ref_matches
+)
+seed_SRME_CS_vect <- cbind(seed_SRME_vect, ref_match_df2[ , c("ref_sum", "ref_matches")])
+seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
 
-ref_match_df2 <- ref_match_df %>% 
-  mutate(ref_sum = rowSums(ref_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
-        SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
-  select(-1)
-str(ref_match_df2)
 
 #### curr ----
-curr_match_df <- extract(PPU_curr_match_SRME_rast, seed_SRME)
+curr_match_df_sl <- extract(PPU_curr_match_SRME_rast, seed_SRME_vect, fun = presence_fun)
+curr_match_df2 <- curr_match_df_sl[ , -1, drop = FALSE]
+curr_sum <- rowSums(curr_match_df2, na.rm = TRUE)
+curr_matches <- apply(curr_match_df2, 1, function(row) { 
+  ids <- names(curr_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+curr_match_df2 <- tibble(
+  SL_ID =  seed_SRME_vect$SL_ID,
+  curr_sum = curr_sum,
+  curr_matches = curr_matches
+)
+seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, curr_match_df2[ , c("curr_sum", "curr_matches")])
+seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
 
-curr_match_df2 <- curr_match_df %>% 
-  mutate(curr_sum = rowSums(curr_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
-         SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
-  select(-1)
 
 #### ssp2 ----
-ssp2_match_df <- extract(PPU_ssp2_match_SRME_rast, seed_SRME)
+ssp2_match_df_sl <- extract(PPU_ssp2_match_SRME_rast, seed_SRME_vect, fun = presence_fun)
+ssp2_match_df2 <- ssp2_match_df_sl[ , -1, drop = FALSE]
+ssp2_sum <- rowSums(ssp2_match_df2, na.rm = TRUE)
+ssp2_matches <- apply(ssp2_match_df2, 1, function(row) { 
+  ids <- names(ssp2_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+ssp2_match_df2 <- tibble(
+  SL_ID =  seed_SRME_vect$SL_ID,
+  ssp2_sum = ssp2_sum,
+  ssp2_matches = ssp2_matches
+)
+seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, ssp2_match_df2[ , c("ssp2_sum", "ssp2_matches")])
+seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
 
-ssp2_match_df2 <- ssp2_match_df %>% 
-  mutate(ssp2_sum = rowSums(ssp2_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
-         SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
-  select(-1)
 
 #### ssp5 ----
-# extract mean "match sum" for each PCU
-ssp5_match_df <- extract(PPU_ssp5_match_SRME_rast, seed_SRME)
+ssp5_match_df_sl <- extract(PPU_ssp5_match_SRME_rast, seed_SRME_vect, fun = presence_fun)
+ssp5_match_df2 <- ssp5_match_df_sl[ , -1, drop = FALSE]
+ssp5_sum <- rowSums(ssp5_match_df2, na.rm = TRUE)
+ssp5_matches <- apply(ssp5_match_df2, 1, function(row) { 
+  ids <- names(ssp5_match_df2)[which(row ==1)]
+  if (length(ids) == 0) NA_character_ else paste(ids, collapse = ",")
+})
+ssp5_match_df2 <- tibble(
+  SL_ID =  seed_SRME_vect$SL_ID,
+  ssp5_sum = ssp5_sum,
+  ssp5_matches = ssp5_matches
+)
+seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, ssp5_match_df2[ , c("ssp5_sum", "ssp5_matches")])
+seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
 
-# rename, arrange, add rank
-ssp5_match_df2 <- ssp5_match_df %>% 
-  mutate(ssp5_sum = rowSums(ssp5_match_df[,-1], na.rm = TRUE), # create match_sum col for filtering
-         SL_ID = seed_SRME$SL_ID) %>% # assign proper ID from seedlot df
-  select(-1)
-
-
-### (b) merge ----
-# combine all 3 dfs
-
-match_join_df <- ref_match_df2 %>% 
-  left_join(curr_match_df2, by = "SL_ID") %>% 
-  left_join(ssp2_match_df2, by = "SL_ID") %>% 
-  left_join(ssp5_match_df2, by = "SL_ID")
-
-# merge with spatvector
-SRME_SLs_matched_full_vect <- seed_SRME %>% 
-  left_join(match_join_df, by = "SL_ID")
-
-seedlots_matched_full_df <- as.data.frame(SRME_SLs_matched_full_vect)
-str(seedlots_matched_full_df)
 
 ##### write & read ----
-writeVector(SRME_SLs_matched_full_vect, "SRME_SLs_matched_full_vect.shp")
-SRME_SLs_matched_full_vect <- vect("SRME_SLs_matched_full_vect.shp")
+writeVector(seed_SRME_CS_vect, "seed_SRME_CS_vect.shp")
+seed_SRME_CS_vect <- vect("seed_SRME_CS_vect.shp")
 
-### (c) select ----
-SRME_SLs_matched_vect <- SRME_SLs_matched_full_vect %>% 
-  select(SL_ID, Lot, species, Year, Balance, name, ref_sum, curr_sum, ssp2_sum, ssp5_sum)
-
-#### write & read ----
-writeVector(SRME_SLs_matched_vect, "SRME_SLs_matched_vect.shp")
-SRME_SLs_matched_vect <- vect("SRME_SLs_matched_vect.shp")
+write.csv(seed_SRME_CS_df, "seed_SRME_CS_df.csv", row.names = FALSE)
 
 
 ### (c) filter ----
 
-#### ssp2, 1 matches ----
-# filter only SLs that meet 1/2 of needs (have a match score >= 10)
-SLs_matched_1_ssp2_vect <- SRME_SLs_matched_vect %>%
+#### ssp2, 1 match ----
+SLs_matched_ssp2_vect <- seed_SRME_CS_vect %>%
   filter(ssp2_sum >= 1)
 
 ##### stats ----
-# has 30 geoms
-(30/158)*100 # 18.98734 % of all the SLs in the SRME are climate matched (under ssp2) with at least 1 PPUs (from the 9000-9500 EB case study)
+# has 31 geoms
+(31/158)*100 # 19.62025 % of all the SLs in the SRME are climate matched (under ssp2) with at least 1 PPUs (from the 9000-9500 EB case study)
 
 ##### write & read ----
-writeVector(SLs_matched_10_ssp2_vect, "SLs_matched_10_ssp2_vect.shp")
-SLs_matched_10_ssp2_vect <- vect("SLs_matched_10_ssp2_vect.shp")
+writeVector(SLs_matched_ssp2_vect, "SLs_matched_ssp2_vect.shp")
+SLs_matched_ssp2_vect <- vect("SLs_matched_ssp2_vect.shp")
 
 
 
