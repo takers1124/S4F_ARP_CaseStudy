@@ -707,7 +707,8 @@ CP_PPU_9000_9500_vect <- CP_PPUs_vect %>%
   # too many for the case study - pick a subset of spatially close polys
     # using Arc to visualize and choose (this is subjective)
 
-CaseStudy_PPUs <- c("223", "225", "232", "235", "239", "281", "282", "283", "286", "287", "288")
+CaseStudy_PPUs <- c("223", "225", "232", "235", "239", "281", "282", "283", "286", "287", "288", # just 11
+                    "7", "14", "15", "356", "357", "359", "401") # 18
 
 CP_PPUs_CaseStudy_vect <- CP_PPUs_vect %>% 
   filter(PPU_ID %in% CaseStudy_PPUs)
