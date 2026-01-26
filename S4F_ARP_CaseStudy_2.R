@@ -214,22 +214,22 @@ str(ref_MCMT_PCU_df) # has original PCU attributes + new extracted climate metri
 
 #### ref ----
   # if want to plant seed adapted to reference climate (collected between 1961-1990 from same zone)
-ref_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ref_ARP_rast)
+ref_MCMT_PPU_df <- extract_clims(CP_PPUs_CaseStudy_vect, ref_ARP_rast)
 str(ref_MCMT_PPU_df)
 
 #### current ----
   # if want to plant seed adapted to current climate (collected today from same zone)
-curr_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, curr_ARP_rast)
+curr_MCMT_PPU_df <- extract_clims(CP_PPUs_CaseStudy_vect, curr_ARP_rast)
 str(curr_MCMT_PPU_df)
 
 #### ssp2 ----
   # if want to plant seed adapted to future ssp2 climate (collected today from different zone)
-ssp2_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ssp2_ARP_rast)
+ssp2_MCMT_PPU_df <- extract_clims(CP_PPUs_CaseStudy_vect, ssp2_ARP_rast)
 str(ssp2_MCMT_PPU_df)
 
 #### ssp5 ----
   # if want to plant seed adapted to future ssp5 climate (collected today from different zone)
-ssp5_MCMT_PPU_df <- extract_clims(CP_PPU_9000_9500_vect, ssp5_ARP_rast)
+ssp5_MCMT_PPU_df <- extract_clims(CP_PPUs_CaseStudy_vect, ssp5_ARP_rast)
 str(ssp5_MCMT_PPU_df)
 
 
@@ -598,7 +598,7 @@ aov_result <- aov(MCMT ~ Period_Scenario + Error(PPU_ID/Period_Scenario), data =
 summary(aov_result)
 
 
-# Pairwise comparisons using Tukey
+# Pairwise comparisons
 pairwise_result <- pairwise.t.test(df_long$MCMT, df_long$Period_Scenario,
                                    paired = TRUE, p.adjust.method = "bonferroni")
 pairwise_result
