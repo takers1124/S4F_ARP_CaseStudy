@@ -517,13 +517,38 @@ ssp5_match_df2 <- tibble(
   ssp5_matches = ssp5_matches
 )
 seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, ssp5_match_df2[ , c("ssp5_sum", "ssp5_matches")])
-seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
+
+
+# ** need to re-run ----
+  # need DEM for all of SRME
+#### Elv medium ----
+# using ARP_DEM created in Part1A_3b
+ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
+summary(ARP_DEM_rast) # min = 1638, max = 4276
+
+# the DEM is in meters, but we want ft
+# convert m to ft
+meters_to_feet_factor <- 3.28084
+ARP_DEM_ft <- ARP_DEM_rast * meters_to_feet_factor 
+summary(ARP_DEM_ft) # min = 5374, max = 14030  
+
+# extract median
+Elv_med_df <- extract(ARP_DEM_ft, seed_SRME_CS_vect, fun=median)
+str(Elv_med_df)
+# rename col
+Elv_med_df <- Elv_med_df %>% 
+  rename(Elv_med_ft = USGS_1_n41w106_20230314) %>% 
+  mutate(SL_ID = seed_SRME_CS_vect$SL_ID) %>% 
+  select(-1)
+seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, Elv_med_df)
+
 
 
 ##### write & read ----
 writeVector(seed_SRME_CS_vect, "seed_SRME_CS_vect.shp")
 seed_SRME_CS_vect <- vect("seed_SRME_CS_vect.shp")
 
+seed_SRME_CS_df <- as.data.frame(seed_SRME_CS_vect)
 write.csv(seed_SRME_CS_df, "seed_SRME_CS_df.csv", row.names = FALSE)
 
 
@@ -540,6 +565,9 @@ SLs_matched_ssp2_vect <- seed_SRME_CS_vect %>%
 ##### write & read ----
 writeVector(SLs_matched_ssp2_vect, "SLs_matched_ssp2_vect.shp")
 SLs_matched_ssp2_vect <- vect("SLs_matched_ssp2_vect.shp")
+
+SLs_matched_ssp2_points_vect <- centroids(SLs_matched_ssp2_vect)
+writeVector(SLs_matched_ssp2_points_vect, "SLs_matched_ssp2_points_vect.shp")
 
 
 
