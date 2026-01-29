@@ -15,15 +15,39 @@ library(tidyverse)
 library(ggplot2)
 library(viridis)
 
-# data prep ----
-## import ----
-# AOI 
+# (1) import data ----
+## AOI ---- 
   # created in part 1
 ARP_vect <- vect("ARP_vect.shp")
 SRME_vect <- vect("SRME_vect.shp")
-CP_PPU_9000_9500_vect <- vect("CP_PPU_9000_9500_vect.shp")
+CP_PPUs_CaseStudy_vect <- vect("CP_PPUs_CaseStudy_vect.shp")
 
-# climate match_sum rasters (for masking)
+## masked data ----
+# we are using LANDFIRE veg data for this section 
+
+### EVT ----
+# we want to know the EVT (existing vegetation) for any areas where we might potentially collect cones
+EVT_CONUS_rast <- rast("LC24_EVT_250.tif")
+  # already in EPSG: 5070 (no need to project)
+is.factor(EVT_CONUS_rast) # TRUE
+# EVT_CONUS_df <- read.csv("LF24_EVT_250.csv")
+levels(EVT_CONUS_rast)
+activeCat(EVT_CONUS_rast)
+
+### BPS ----
+# we want to know the BPS (potential vegetation) for any areas where we might potentially plant seedlings
+BPS_CONUS_rast <- rast("LC20_BPS_220.tif")
+  # already in EPSG: 5070 (no need to project)
+is.factor(BPS_CONUS_rast) # TRUE
+# BPS_CONUS_df <- read.csv("LC20_BPS_220.csv")
+levels(BPS_CONUS_rast)
+activeCat(BPS_CONUS_rast) <- "BPS_NAME"
+
+
+
+## masking data ----
+### clim_match ----
+# climate match_sum rasters
   # created in part 3 with output from part 2
     # these are specific (climate matched) to our case study PPUs
   # only using current and ssp2 time periods
@@ -32,101 +56,264 @@ PPU_curr_match_sum_SRME_rast <- rast("PPU_curr_match_sum_SRME_rast.tif")
 PPU_ssp2_match_sum_ARP_rast <- rast("PPU_ssp2_match_sum_ARP_rast.tif")
 PPU_ssp2_match_sum_SRME_rast <- rast("PPU_ssp2_match_sum_SRME_rast.tif")
 
-plot(PPU_curr_match_sum_ARP_rast)
-plot(is.na(PPU_curr_match_sum_ARP_rast))
 
-# EVT
-  # already in EPSG: 5070 (no need to project)
-EVT_24CONUS_rast <- rast("LC24_EVT_250.tif")
-is.factor(EVT_24CONUS_rast) # TRUE
-# EVT_24CONUS_df <- read.csv("LF24_EVT_250.csv")
+### QMD ----
+# also going to mask the veg data with same QMD & EVH thresholds set for PCU creation (Part1A)
+# we only want to know what the veg type is in areas that are suitable for cone collection
 
-EVT_16CONUS_rast <- rast("LC16_EVT_200.tif")
-is.factor(EVT_16CONUS_rast) # TRUE
-# EVT_16CONUS_df <- read.csv("LF16_EVT_200.csv")
+# filtered versions of this dataset was already created for the ARP in Part1A
+ARP_QMD_filt_rast <- rast("ARP_QMD_filt_rast.tif")
 
-## crop and mask ----
-# we want to know what the EVT is for the entire match area
-# first, going to convert the match_sum rasters to polygons to make masking easier
-# then crop & mask the EVT to that match_sum area
+# need to make filtered version for SRME
+## QMD
+QMD_CONUS <- rast("TreeMap2022_CONUS_QMD.tif")
+  # already in 5070
 
-### EVT_ARP_curr ----
-curr_match_ARP_vect <- aggregate(as.polygons(PPU_curr_match_sum_ARP_rast))
-EVT_ARP_curr_rast <- crop(EVT_24CONUS_rast, curr_match_ARP_vect, mask = TRUE)
+# crop and mask
+SRME_QMD_rast <- crop(QMD_CONUS, SRME_vect, mask=TRUE)
+
+# reclassify with ifel()
+SRME_QMD_filt_rast <- ifel(
+  SRME_QMD_rast >= 5, 5, NA 
+)
+  # if >= 5 inches, reclassify to 5
+  # if < 5 inches, reclassify to NA
+
+### write & read ----
+writeRaster(SRME_QMD_filt_rast, "SRME_QMD_filt_rast.tif")
+SRME_QMD_filt_rast <- rast("SRME_QMD_filt_rast.tif")
+
+
+### EVH ----
+# filtered versions of this dataset was already created for the ARP in Part1A
+ARP_EVH_filt_rast <- rast("ARP_EVH_filt_rast.tif")
+
+# need to make filtered version for SRME
+EVH_CONUS <- rast("LC24_EVH_250.tif")
+
+# crop and mask
+EVH_SRME <- crop(EVH_CONUS, SRME_vect, mask=TRUE)
+
+# reclassify with ifel()
+  # define conversion factor
+meters_to_feet_factor <- 3.28084
+
+SRME_EVH_filt_rast <- ifel(
+  # condition 1: it is dominant veg type trees? (values 101-199)
+  EVH_SRME >= 101 & EVH_SRME < 200,
+  # if TRUE, 
+  # condition 2: is it > 10 ft tall? 
+  ifel(
+    (EVH_SRME - 100) * meters_to_feet_factor > 10, # subtract offset, convert units, filter
+    10, # if TRUE, reclassify to 10
+    NA # if FALSE, reclassify to NA
+  ),
+  NA # if not a tree value (condition 1 = FALSE), reclassify to NA
+)
+
+### write & read ----
+writeRaster(SRME_EVH_filt_rast, "SRME_EVH_filt_rast.tif")
+SRME_EVH_filt_rast <- rast("SRME_EVH_filt_rast.tif")
+
+
+
+# (2) process veg data ----
+# what we want:
+  # to know what the EVT is only for the climate_match_sum and trees area
+  # a data frame for each group to use in graph-making
+
+## EVT_ARP_curr ----
+### make mask rast ----
+ARP_curr_resampled <- resample(PPU_curr_match_sum_ARP_rast, ARP_EVH_filt_rast, method = "near")
+# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+
+raster_list <- list(ARP_QMD_filt_rast,
+                    ARP_EVH_filt_rast,
+                    ARP_curr_resampled)
+
+# create a multi-layer raster stack 
+resampled_rast_stack <- rast(raster_list)
+# has 3 layers, each has same extent and resolution
+
+# sum
+ARP_curr_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+# has values: min = 1, max = 30
+# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+
+# make cell value = 1 for all areas that meet our mask requirement & value = NA if not
+ARP_curr_mask_rast <- ifel(
+  ARP_curr_combined_rast >= 16,
+  ARP_curr_combined_rast, NA)
+
+### make mask poly ----
+ARP_curr_mask_poly <- aggregate(as.polygons(ARP_curr_mask_rast))
+
+### crop and mask ----
+EVT_ARP_curr_rast <- crop(EVT_24CONUS_rast, ARP_curr_mask_poly, mask = TRUE)
 plot(EVT_ARP_curr_rast)
 
-### EVT_SRME_curr ----
-curr_match_SRME_vect <- aggregate(as.polygons(PPU_curr_match_sum_SRME_rast))
-EVT_SRME_curr_rast <- crop(EVT_24CONUS_rast, curr_match_SRME_vect, mask = TRUE)
-plot(EVT_SRME_curr_rast)
-
-### EVT_ARP_ssp2 ----
-ssp2_match_ARP_vect <- aggregate(as.polygons(PPU_ssp2_match_sum_ARP_rast))
-EVT_ARP_ssp2_rast <- crop(EVT_24CONUS_rast, ssp2_match_ARP_vect, mask = TRUE)
-plot(EVT_ARP_ssp2_rast)
-
-### EVT_SRME_ssp2 ----
-ssp2_match_SRME_vect <- as.polygons(PPU_ssp2_match_sum_SRME_rast)
-EVT_SRME_ssp2_rast <- crop(EVT_24CONUS_rast, ssp2_match_SRME_vect, mask = TRUE)
-plot(EVT_SRME_ssp2_rast)
-
-### EVT16_PPUs ----
-EVT16_PPUs_rast <- crop(EVT_16CONUS_rast, CP_PPU_9000_9500_vect, mask = TRUE)
-plot(EVT16_PPUs_rast)
-
-
-## tables ----
-  # get frequency table & make ready to graph
-
-### EVT_ARP_curr ----
+### table ----
 EVT_ARP_curr_df <- as.data.frame(freq(EVT_ARP_curr_rast)) %>%
   mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
-         Group = factor("ARP_curr")) %>% 
+         Group = factor("ARP_EVT_curr")) %>% 
   rename(EVT_NAME = value) %>% 
   arrange(desc(REL_PERCENT)) %>% 
   select(Group, EVT_NAME, REL_PERCENT)
 
-### EVT_SRME_curr ----
+
+## EVT_SRME_curr ----
+### make mask rast ----
+SRME_curr_resampled <- resample(PPU_curr_match_sum_SRME_rast, SRME_EVH_filt_rast, method = "near")
+# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+
+raster_list <- list(SRME_QMD_filt_rast,
+                    SRME_EVH_filt_rast,
+                    SRME_curr_resampled)
+
+# create a multi-layer raster stack 
+resampled_rast_stack <- rast(raster_list)
+# has 3 layers, each has same extent and resolution
+
+# sum
+SRME_curr_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+# has values: min = 1, max = 30
+# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+
+# make cell value = 1 for all areas that meet our mask requirement & value = NA if not
+SRME_curr_mask_rast <- ifel(
+  SRME_curr_combined_rast >= 16,
+  SRME_curr_combined_rast, NA)
+
+### make mask poly ----
+SRME_curr_mask_poly <- aggregate(as.polygons(SRME_curr_mask_rast))
+
+### crop and mask ----
+EVT_SRME_curr_rast <- crop(EVT_24CONUS_rast, SRME_curr_mask_poly, mask = TRUE)
+plot(EVT_SRME_curr_rast)
+
+### table ----
 EVT_SRME_curr_df <- as.data.frame(freq(EVT_SRME_curr_rast)) %>%
   mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
-         Group = factor("SRME_curr")) %>% 
+         Group = factor("SRME_EVT_curr")) %>% 
   rename(EVT_NAME = value) %>% 
   arrange(desc(REL_PERCENT)) %>% 
   select(Group, EVT_NAME, REL_PERCENT)
 
-### EVT_ARP_ssp2 ----
+
+
+## EVT_ARP_ssp2 ----
+### make mask rast ----
+ARP_ssp2_resampled <- resample(PPU_ssp2_match_sum_ARP_rast, ARP_EVH_filt_rast, method = "near")
+# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+
+raster_list <- list(ARP_QMD_filt_rast,
+                    ARP_EVH_filt_rast,
+                    ARP_ssp2_resampled)
+
+# create a multi-layer raster stack 
+resampled_rast_stack <- rast(raster_list)
+# has 3 layers, each has same extent and resolution
+
+# sum
+ARP_ssp2_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+# has values: min = 1, max = 30
+# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+
+# make cell value = 1 for all areas that meet our mask requirement & value = NA if not
+ARP_ssp2_mask_rast <- ifel(
+  ARP_ssp2_combined_rast >= 16,
+  ARP_ssp2_combined_rast, NA)
+
+### make mask poly ----
+ARP_ssp2_mask_poly <- aggregate(as.polygons(ARP_ssp2_mask_rast))
+
+### crop and mask ----
+EVT_ARP_ssp2_rast <- crop(EVT_24CONUS_rast, ARP_ssp2_mask_poly, mask = TRUE)
+plot(EVT_ARP_ssp2_rast)
+
+### table ----
 EVT_ARP_ssp2_df <- as.data.frame(freq(EVT_ARP_ssp2_rast)) %>%
   mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
-         Group = factor("ARP_ssp2")) %>% 
+         Group = factor("ARP_EVT_ssp2")) %>% 
   rename(EVT_NAME = value) %>% 
   arrange(desc(REL_PERCENT)) %>% 
   select(Group, EVT_NAME, REL_PERCENT)
 
-### EVT_SRME_ssp2 ----
+
+
+## EVT_SRME_ssp2 ----
+### make mask rast ----
+SRME_ssp2_resampled <- resample(PPU_ssp2_match_sum_SRME_rast, SRME_EVH_filt_rast, method = "near")
+# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+
+raster_list <- list(SRME_QMD_filt_rast,
+                    SRME_EVH_filt_rast,
+                    SRME_ssp2_resampled)
+
+# create a multi-layer raster stack 
+resampled_rast_stack <- rast(raster_list)
+# has 3 layers, each has same extent and resolution
+
+# sum
+SRME_ssp2_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
+# has values: min = 1, max = 30
+# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+
+# make cell value = 1 for all areas that meet our mask requirement & value = NA if not
+SRME_ssp2_mask_rast <- ifel(
+  SRME_ssp2_combined_rast >= 16,
+  SRME_ssp2_combined_rast, NA)
+
+### make mask poly ----
+SRME_ssp2_mask_poly <- aggregate(as.polygons(SRME_ssp2_mask_rast))
+
+### crop and mask ----
+EVT_SRME_ssp2_rast <- crop(EVT_24CONUS_rast, SRME_ssp2_mask_poly, mask = TRUE)
+plot(EVT_SRME_ssp2_rast)
+
+### table ----
 EVT_SRME_ssp2_df <- as.data.frame(freq(EVT_SRME_ssp2_rast)) %>%
   mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
-         Group = factor("SRME_ssp2")) %>% 
+         Group = factor("SRME_EVT_ssp2")) %>% 
   rename(EVT_NAME = value) %>% 
   arrange(desc(REL_PERCENT)) %>% 
   select(Group, EVT_NAME, REL_PERCENT)
 
-### EVT16_PPUs ----
-EVT16_PPUs_df <- freq(EVT16_PPUs_rast) %>%
+
+
+## EVT_PPUs ----
+# note, if I want to combine the BPS data with the EVT data for graphing (step 3 below),
+# I will need to make the column name the same for all datasets
+# so, for ease of graphing and visualization, I will set the veg category name as EVT eventhough this is BPS data
+
+### crop and mask ----
+EVT_PPU_rast <- crop(BPS_CONUS_rast, CP_PPUs_CaseStudy_vect, mask = TRUE)
+plot(EVT_PPU_rast)
+
+### table ----
+EVT_PPU_df <- freq(EVT_PPU_rast) %>%
   as.data.frame() %>% 
   mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
-         Group = factor("PPUs")) %>% 
-  rename(EVT_NAME = value) %>% 
+         Group = factor("PPUs_BPS")) %>% # retain BPS for group name (for x axis)
+  rename(EVT_NAME = value) %>%  
   arrange(desc(REL_PERCENT)) %>% 
   select(Group, EVT_NAME, REL_PERCENT)
+  
 
 
-## combine & plot ----
-EVT_combined_df <- bind_rows(EVT16_PPUs_df,
+# (3) combine & plot ----
+# combine 5 dataframes set up in step 2
+EVT_combined_df <- bind_rows(BPS_PPU_df,
                              EVT_ARP_curr_df,
                              EVT_ARP_ssp2_df,
                              EVT_SRME_curr_df,
                              EVT_SRME_ssp2_df)
+# 
 
+
+
+
+## old code ----
 # pick top 10 EVTs for each group
 EVT_top10 <- EVT_combined_df %>% 
   slice_head(, n= 10, by = Group)
@@ -173,23 +360,11 @@ EVT_combined_stackbar <-
   # still not exactly what we want, but good enough for now... 
 
 
-## add elevation rank ----
+## add elevation rank? ----
 # we want the evt legend to be ordered by elevation
   # we will rank each EVT based on natural history data
 
-### (1) set evt ranks ----
 
-
-
-
-
-### (2) combine with EVT_top10 df ----
-
-
-### (3) define legend order ----
-
-
-### (4) plot anew ----
   
   
 
