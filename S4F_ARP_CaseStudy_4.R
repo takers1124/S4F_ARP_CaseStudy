@@ -11,6 +11,7 @@
 library(terra) 
 library(tidyterra) 
 library(dplyr)
+
 library(tidyverse)
 library(ggplot2)
 library(viridis)
@@ -125,7 +126,7 @@ SRME_EVH_filt_rast <- rast("SRME_EVH_filt_rast.tif")
 ## EVT_ARP_curr ----
 ### make mask rast ----
 ARP_curr_resampled <- resample(PPU_curr_match_sum_ARP_rast, ARP_EVH_filt_rast, method = "near")
-# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+  # using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
 
 raster_list <- list(ARP_QMD_filt_rast,
                     ARP_EVH_filt_rast,
@@ -133,24 +134,35 @@ raster_list <- list(ARP_QMD_filt_rast,
 
 # create a multi-layer raster stack 
 resampled_rast_stack <- rast(raster_list)
-# has 3 layers, each has same extent and resolution
+  # has 3 layers, each has same extent and resolution
 
 # sum
 ARP_curr_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
-# has values: min = 1, max = 30
-# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+  # has values: min = 1, max = 30
+  # values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+plot(ARP_curr_combined_rast)
 
 # make cell value = 1 for all areas that meet our mask requirement & value = NA if not
 ARP_curr_mask_rast <- ifel(
   ARP_curr_combined_rast >= 16,
   ARP_curr_combined_rast, NA)
+plot(ARP_curr_mask_rast)
 
 ### make mask poly ----
-ARP_curr_mask_poly <- aggregate(as.polygons(ARP_curr_mask_rast))
+ARP_curr_mask_poly <- aggregate(as.polygons(ARP_curr_mask_rast, values = FALSE))
+plot(ARP_curr_mask_poly)
+
+#### write & read ----
+writeVector(ARP_curr_mask_poly, "ARP_curr_mask_poly.shp")
+ARP_curr_mask_poly <- vect("ARP_curr_mask_poly.shp")
 
 ### crop and mask ----
-EVT_ARP_curr_rast <- crop(EVT_24CONUS_rast, ARP_curr_mask_poly, mask = TRUE)
+EVT_ARP_curr_rast <- crop(EVT_CONUS_rast, ARP_curr_mask_poly, mask = TRUE)
 plot(EVT_ARP_curr_rast)
+
+#### write & read ----
+writeRaster(EVT_ARP_curr_rast, "EVT_ARP_curr_rast.tif")
+EVT_ARP_curr_rast <- rast(EVT_ARP_curr_rast)
 
 ### table ----
 EVT_ARP_curr_df <- as.data.frame(freq(EVT_ARP_curr_rast)) %>%
@@ -164,7 +176,7 @@ EVT_ARP_curr_df <- as.data.frame(freq(EVT_ARP_curr_rast)) %>%
 ## EVT_SRME_curr ----
 ### make mask rast ----
 SRME_curr_resampled <- resample(PPU_curr_match_sum_SRME_rast, SRME_EVH_filt_rast, method = "near")
-# using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
+  # using "near" bc the match_sum raster is categorical (with values 1-15 representing categories, not integers) 
 
 raster_list <- list(SRME_QMD_filt_rast,
                     SRME_EVH_filt_rast,
@@ -172,24 +184,53 @@ raster_list <- list(SRME_QMD_filt_rast,
 
 # create a multi-layer raster stack 
 resampled_rast_stack <- rast(raster_list)
-# has 3 layers, each has same extent and resolution
+  # has 3 layers, each has same extent and resolution
 
 # sum
 SRME_curr_combined_rast <- app(resampled_rast_stack, fun = "sum", na.rm = TRUE)
-# has values: min = 1, max = 30
-# values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+  # has values: min = 1, max = 30
+  # values >= 16 will include both QMD (5) + EVH (10) + match (1-15)
+plot(SRME_curr_combined_rast)
 
 # make cell value = 1 for all areas that meet our mask requirement & value = NA if not
 SRME_curr_mask_rast <- ifel(
   SRME_curr_combined_rast >= 16,
   SRME_curr_combined_rast, NA)
+plot(SRME_curr_mask_rast)
 
-### make mask poly ----
+### make mask poly V1 ----
 SRME_curr_mask_poly <- aggregate(as.polygons(SRME_curr_mask_rast))
+  # ran for 4 hours on my PC and remote computer - I stopped it before finished both times 
+plot(SRME_curr_mask_poly)
+
+### make mask poly V2 ----
+  # try separating 2 functions
+  # add values = FALSE
+SRME_curr_mask_BIGpoly <- as.polygons(SRME_curr_mask_rast, values = FALSE)
+  # only ~ 2 mins to run with values = FALSE
+SRME_curr_mask_poly <- aggregate(SRME_curr_mask_BIGpoly)
+  # started 9:50, ran to 13:20 then I stopped it
+
+### make mask poly V3 ----
+SRME_curr_mask_BIGpoly <- as.polygons(SRME_curr_mask_rast, values = FALSE)
+
+  # try adding count = FALSE
+SRME_curr_mask_poly <- aggregate(SRME_curr_mask_BIGpoly, count = FALSE)
+  # started 1:50, ran to 3:00 then stopped
+
+
+
+#### write & read ----
+writeVector(SRME_curr_mask_poly, "SRME_curr_mask_poly.shp")
+SRME_curr_mask_poly <- vect("SRME_curr_mask_poly.shp")
 
 ### crop and mask ----
-EVT_SRME_curr_rast <- crop(EVT_24CONUS_rast, SRME_curr_mask_poly, mask = TRUE)
+EVT_SRME_curr_rast <- crop(EVT_CONUS_rast, SRME_curr_mask_poly, mask = TRUE)
 plot(EVT_SRME_curr_rast)
+
+#### write & read ----
+writeRaster(EVT_SRME_curr_rast, "EVT_SRME_curr_rast.tif")
+EVT_SRME_curr_rast <- rast(EVT_SRME_curr_rast)
 
 ### table ----
 EVT_SRME_curr_df <- as.data.frame(freq(EVT_SRME_curr_rast)) %>%
@@ -225,11 +266,19 @@ ARP_ssp2_mask_rast <- ifel(
   ARP_ssp2_combined_rast, NA)
 
 ### make mask poly ----
-ARP_ssp2_mask_poly <- aggregate(as.polygons(ARP_ssp2_mask_rast))
+ARP_ssp2_mask_poly <- aggregate(as.polygons(ARP_ssp2_mask_rast, values = FALSE))
+
+#### write & read ----
+writeVector(ARP_ssp2_mask_poly, "ARP_ssp2_mask_poly.shp")
+ARP_ssp2_mask_poly <- vect("ARP_ssp2_mask_poly.shp")
 
 ### crop and mask ----
-EVT_ARP_ssp2_rast <- crop(EVT_24CONUS_rast, ARP_ssp2_mask_poly, mask = TRUE)
+EVT_ARP_ssp2_rast <- crop(EVT_CONUS_rast, ARP_ssp2_mask_poly, mask = TRUE)
 plot(EVT_ARP_ssp2_rast)
+
+#### write & read ----
+writeRaster(EVT_ARP_ssp2_rast, "EVT_ARP_ssp2_rast.tif")
+EVT_ARP_ssp2_rast <- rast(EVT_ARP_ssp2_rast)
 
 ### table ----
 EVT_ARP_ssp2_df <- as.data.frame(freq(EVT_ARP_ssp2_rast)) %>%
@@ -265,11 +314,19 @@ SRME_ssp2_mask_rast <- ifel(
   SRME_ssp2_combined_rast, NA)
 
 ### make mask poly ----
-SRME_ssp2_mask_poly <- aggregate(as.polygons(SRME_ssp2_mask_rast))
+SRME_ssp2_mask_poly <- aggregate(as.polygons(SRME_ssp2_mask_rast, values = FALSE))
+
+#### write & read ----
+writeVector(SRME_ssp2_mask_poly, "SRME_ssp2_mask_poly.shp")
+SRME_ssp2_mask_poly <- vect("SRME_ssp2_mask_poly.shp")
 
 ### crop and mask ----
-EVT_SRME_ssp2_rast <- crop(EVT_24CONUS_rast, SRME_ssp2_mask_poly, mask = TRUE)
+EVT_SRME_ssp2_rast <- crop(EVT_CONUS_rast, SRME_ssp2_mask_poly, mask = TRUE)
 plot(EVT_SRME_ssp2_rast)
+
+#### write & read ----
+writeRaster(EVT_SRME_ssp2_rast, "EVT_SRME_ssp2_rast.tif")
+EVT_SRME_ssp2_rast <- rast(EVT_SRME_ssp2_rast)
 
 ### table ----
 EVT_SRME_ssp2_df <- as.data.frame(freq(EVT_SRME_ssp2_rast)) %>%
@@ -308,11 +365,58 @@ EVT_combined_df <- bind_rows(BPS_PPU_df,
                              EVT_ARP_ssp2_df,
                              EVT_SRME_curr_df,
                              EVT_SRME_ssp2_df)
-# 
 
 
 
 
+## new code (untested) ----
+library(forcats)
+library(scales)
+
+# adjust dataframe for graphing
+  # lump rare categories (< 1%) within each Group
+evt_lumped <- EVT_combined_df %>%
+  group_by(Group) %>%
+  mutate(
+    EVT_name_lumped = if_else(REL_PERCENT < 1, "Other", EVT_name)
+  ) %>%
+  # aggregate to a single "Other" per Group
+  group_by(Group, EVT_name_lumped) %>%
+  summarise(REL_PERCENT = sum(REL_PERCENT), .groups = "drop") %>%
+  # order legend by overall contribution across all groups
+  group_by(EVT_name_lumped) %>%
+  mutate(total_rel = sum(REL_PERCENT)) %>%
+  ungroup() %>% # make a factor and order by total_rel
+  mutate(EVT_name_lumped = fct_reorder(EVT_name_lumped, total_rel, .desc = TRUE)) 
+
+# sanity check: each group sums to 100
+evt_lumped %>%
+  group_by(Group) %>%
+  summarise(total = sum(REL_PERCENT))
+
+# plot
+
+EVT_plot <- ggplot(evt_lumped, aes(x = Group, y = REL_PERCENT, fill = EVT_name_lumped)) +
+  geom_bar(stat = "identity", width = 0.8, color = "white", size = 0.2) +
+  scale_y_continuous(labels = percent_format(scale = 1)) +
+  scale_fill_manual(
+    values = c("Other" = "grey70"),
+    guide = guide_legend(title = "Vegetation type")
+  ) +
+  labs(x = NULL, y = "Relative percent", title = "Vegetation composition by group") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    legend.position = "right"
+  )
+
+  # try as-is (above) and try changes (below)
+geom_col(position = position_stack(reverse = TRUE), color = "white", linewidth = 0.3) +
+  scale_fill_viridis_d(option = "B", direction = 1) +
+
+  
+  
+  
 ## old code ----
 # pick top 10 EVTs for each group
 EVT_top10 <- EVT_combined_df %>% 
