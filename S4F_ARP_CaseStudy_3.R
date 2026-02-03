@@ -519,7 +519,7 @@ ssp5_match_df2 <- tibble(
 seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, ssp5_match_df2[ , c("ssp5_sum", "ssp5_matches")])
 
 
-# ** need to re-run ----
+# ** need to run ----
   # need DEM for all of SRME
 #### Elv medium ----
 # using ARP_DEM created in Part1A_3b
