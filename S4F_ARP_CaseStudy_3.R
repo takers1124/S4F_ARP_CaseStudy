@@ -520,8 +520,10 @@ seed_SRME_CS_vect <- cbind(seed_SRME_CS_vect, ssp5_match_df2[ , c("ssp5_sum", "s
 
 
 # ** need to run ----
-  # need DEM for all of SRME
+  # first need DEM for all of SRME
 #### Elv medium ----
+
+# **modify for SRME
 # using ARP_DEM created in Part1A_3b
 ARP_DEM_rast <- rast("ARP_DEM_rast.tif")
 summary(ARP_DEM_rast) # min = 1638, max = 4276
