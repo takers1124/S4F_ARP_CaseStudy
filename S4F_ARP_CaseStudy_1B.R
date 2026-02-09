@@ -569,3 +569,12 @@ write.csv(ARP_PCUs_df, "ARP_PCUs_df.csv", row.names = FALSE)
 writeVector(ARP_PCUs_vect, "ARP_PCUs_vect.shp")
 ARP_PCUs_vect <- vect("ARP_PCUs_vect.shp")
 
+## select Lady Moon ----
+# this is the case study PCU that we will use for FWD climate matching in part 2
+# the PCU closest to the Lady Moon trail head has PCU_ID = 212
+
+PCU_LM_vect <- ARP_PCUs_vect %>% 
+  filter(PCU_ID == 204)
+plot(PCU_LM_vect)
+
+PCU_LM_df <- as.data.frame(PCU_LM_vect)

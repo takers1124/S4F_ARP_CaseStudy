@@ -199,7 +199,7 @@ extract_clims <- function(zones, clim_rast) {
 
 #### ref ----
 # we only want to extract the ref clim from this PCU
-ref_MCMT_PCU_df <- extract_clims(PCU_LM, ref_ARP_rast)
+ref_MCMT_PCU_df <- extract_clims(PCU_LM_vect, ref_ARP_rast)
 str(ref_MCMT_PCU_df) # has original PCU attributes + new extracted climate metrics
 
 

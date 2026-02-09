@@ -19,7 +19,6 @@ library(dplyr)
 # the Area of Interest (AOI) for this case study is the Arapaho-Roosevelt National Forest (ARP)
 ### load & process ----
 NF_CONUS_vect <- vect("S_USA.FSCommonNames.shp")
-
 plot(NF_CONUS_vect)
 
 # see unique names 
@@ -29,7 +28,6 @@ unique(NF_CONUS_vect$COMMONNAME)
 # select for just ARP 
 ARP_vect <- NF_CONUS_vect %>%
   filter(COMMONNAME == "Arapaho and Roosevelt National Forests")
-
 plot(ARP_vect)
 
 # project 
@@ -38,8 +36,6 @@ ARP_vect <- project(ARP_vect,"EPSG:5070")
 # calc area
 expanse(ARP_vect) # 6975245280 m^2
 6975245280/4046.86 # 4046.86 m/acre = 1723619 acres
-
-expanse(ARP_vect, unit = "ha")
 
 #### write & read ----
 writeVector(ARP_vect, "ARP_vect.shp")
@@ -92,7 +88,7 @@ global(ARP_QMD_rast, fun = "notNA") # 5697616 cells
 
 # reclassify with ifel()
 ARP_QMD_filt_rast <- ifel(
-  QMD_ARP_rast >= 5, 5, NA 
+  ARP_QMD_rast >= 5, 5, NA 
 )
 # if >= 5 inches, reclassify to 5
 # if < 5 inches, reclassify to NA
