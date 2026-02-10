@@ -403,7 +403,7 @@ ARP_PCUs_CS_df <- as.data.frame(ARP_PCUs_CS_vect)
 write.csv(ARP_PCUs_CS_df, "ARP_PCUs_CS_df.csv", row.names = FALSE)
 
 
-### (c) filter ----
+### (c) filter 2 ----
 
 #### ssp2, 1 match----
 # filter only PCUs that are within future-climate-matched areas (have a match score >= 1 for spp2)
@@ -425,7 +425,38 @@ polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
 writeVector(PCUs_matched_ssp2_vect, "PCUs_matched_ssp2_vect.shp")
 PCUs_matched_ssp2_vect <- vect("PCUs_matched_ssp2_vect.shp")
 
+PCUs_ssp2_df <- as.data.frame(PCUs_matched_ssp2_vect)
 
+### (d) filter 3 ----
+# these is the objective-specific filter,
+# we are inventing the objectives for the case study
+# they are to model the options that managers have when prioritizing PCUs
+
+# we could of course combine these filters into one code chunk
+# but I want to get the breakdown for each category
+
+#### target sp ----
+PCUs_ssp2_f3_sp <- PCUs_matched_ssp2_vect %>% 
+  filter(PIPO_tons >= 10)
+  # has 641 geoms
+
+#### district ----
+PCUs_ssp2_f3_dist <- PCUs_ssp2_f3_sp %>% 
+  filter(DISTRICTNA == "Canyon Lakes Ranger District")
+  # has 430 geoms
+
+#### elevation ----
+PCUs_ssp2_f3_elv <- PCUs_ssp2_f3_dist %>% 
+  filter(Elv_med_ft >= 8000)
+  # has 67 geoms
+
+(67/6428)*100 # 1.042315 % of all the PCUs in the ARP meet filter 3 objectives
+
+sum(PCUs_ssp2_f3_elv$area_acres) # 8092.143 acres
+# ARP is 1723619 acres
+(8092.143/1723619)*100 # 0.4694856 % of area of ARP
+
+0.75/2
 
 
 ## (3) overlay Nursery ----
