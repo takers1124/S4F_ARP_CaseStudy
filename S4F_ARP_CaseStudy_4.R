@@ -12,9 +12,9 @@ library(terra)
 library(tidyterra) 
 library(dplyr)
 
-library(tidyverse)
 library(ggplot2)
-library(viridis)
+library(scales) # percent_format()
+
 
 # (1) import data ----
 ## AOI ---- 
@@ -117,8 +117,51 @@ writeRaster(SRME_EVH_filt_rast, "SRME_EVH_filt_rast.tif")
 SRME_EVH_filt_rast <- rast("SRME_EVH_filt_rast.tif")
 
 
+# (2) process veg data - V2 ----
+# what we want:
+    # to know what the EVT is for the PCUs, but only for those PCUs that fall into the clim match area
+# V2: no need to re-threshold the EVT & QMD data - just use already created PCUs_matched polygons
+ 
+# move this up to (1 - import data) in cleaning
+# import filtered PCUs
+  # these were filtered by climate match in part 3_c (filter 2)
+PCUs_matched_curr_vect <- vect("PCUs_matched_curr_vect.shp")
+PCUs_matched_ssp2_vect <- vect("PCUs_matched_ssp2_vect.shp")
 
-# (2) process veg data ----
+## ARP curr ----
+### crop and mask ----
+EVT_ARP_curr_rast <- crop(EVT_CONUS_rast, PCUs_matched_curr_vect, mask = TRUE)
+plot(EVT_ARP_curr_rast)
+
+### table ----
+EVT_ARP_curr_df <- as.data.frame(freq(EVT_ARP_curr_rast)) %>%
+  mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
+         Group = factor("ARP_EVT_curr")) %>% 
+  rename(EVT_NAME = value) %>% 
+  arrange(desc(REL_PERCENT)) %>% 
+  select(Group, EVT_NAME, REL_PERCENT)
+
+## ARP ssp2 ----
+### crop and mask ----
+EVT_ARP_ssp2_rast <- crop(EVT_CONUS_rast, PCUs_matched_ssp2_vect, mask = TRUE)
+plot(EVT_ARP_ssp2_rast)
+
+### table ----
+EVT_ARP_ssp2_df <- as.data.frame(freq(EVT_ARP_ssp2_rast)) %>%
+  mutate(REL_PERCENT = round((count / sum(count)) * 100, 3),
+         Group = factor("ARP_EVT_ssp2")) %>% 
+  rename(EVT_NAME = value) %>% 
+  arrange(desc(REL_PERCENT)) %>% 
+  select(Group, EVT_NAME, REL_PERCENT)
+
+
+
+
+
+
+
+
+# (2) process veg data - V1 ----
 # what we want:
   # to know what the EVT is only for the climate_match_sum and trees area
   # a data frame for each group to use in graph-making
@@ -360,113 +403,60 @@ EVT_PPU_df <- freq(EVT_PPU_rast) %>%
 
 # (3) combine & plot ----
 # combine 5 dataframes set up in step 2
-EVT_combined_df <- bind_rows(BPS_PPU_df,
+EVT_combined_df <- bind_rows(EVT_PPU_df,
                              EVT_ARP_curr_df,
                              EVT_ARP_ssp2_df,
                              EVT_SRME_curr_df,
                              EVT_SRME_ssp2_df)
 
+# combine 3 dataframes set up in step 2
+EVT_combined_df <- bind_rows(EVT_PPU_df,
+                             EVT_ARP_curr_df,
+                             EVT_ARP_ssp2_df)
 
 
+# set up dataframe for plotting
 
-## new code (untested) ----
-library(forcats)
-library(scales)
-
-# adjust dataframe for graphing
-  # lump rare categories (< 1%) within each Group
+# lump EVT_NAMES
 evt_lumped <- EVT_combined_df %>%
-  group_by(Group) %>%
-  mutate(
-    EVT_name_lumped = if_else(REL_PERCENT < 1, "Other", EVT_name)
-  ) %>%
-  # aggregate to a single "Other" per Group
+  mutate(EVT_name_lumped = if_else(REL_PERCENT < 1, "Other", EVT_NAME)) %>%
   group_by(Group, EVT_name_lumped) %>%
-  summarise(REL_PERCENT = sum(REL_PERCENT), .groups = "drop") %>%
-  # order legend by overall contribution across all groups
+  summarise(REL_PERCENT = sum(REL_PERCENT), .groups = "drop")
+
+# compute global totals per lumped name for legend/stack order
+lvl_order <- evt_lumped %>%
   group_by(EVT_name_lumped) %>%
-  mutate(total_rel = sum(REL_PERCENT)) %>%
-  ungroup() %>% # make a factor and order by total_rel
-  mutate(EVT_name_lumped = fct_reorder(EVT_name_lumped, total_rel, .desc = TRUE)) 
+  summarise(total_rel = sum(REL_PERCENT), .groups = "drop") %>%
+  arrange(desc(total_rel)) %>%
+  pull(EVT_name_lumped)
 
-# sanity check: each group sums to 100
-evt_lumped %>%
-  group_by(Group) %>%
-  summarise(total = sum(REL_PERCENT))
-
-# plot
-
-EVT_plot <- ggplot(evt_lumped, aes(x = Group, y = REL_PERCENT, fill = EVT_name_lumped)) +
-  geom_bar(stat = "identity", width = 0.8, color = "white", size = 0.2) +
-  scale_y_continuous(labels = percent_format(scale = 1)) +
-  scale_fill_manual(
-    values = c("Other" = "grey70"),
-    guide = guide_legend(title = "Vegetation type")
-  ) +
-  labs(x = NULL, y = "Relative percent", title = "Vegetation composition by group") +
-  theme_minimal(base_size = 12) +
-  theme(
-    panel.grid.major.x = element_blank(),
-    legend.position = "right"
+# ensure clean types
+evt_lumped <- evt_lumped %>%
+  mutate(
+    EVT_name_lumped = factor(EVT_name_lumped, levels = lvl_order),
+    Group = as.factor(Group),
+    REL_PERCENT = as.numeric(REL_PERCENT)
   )
 
-  # try as-is (above) and try changes (below)
-geom_col(position = position_stack(reverse = TRUE), color = "white", linewidth = 0.3) +
-  scale_fill_viridis_d(option = "B", direction = 1) +
+# check each group sums to 100
+evt_lumped %>%
+  group_by(Group) %>%
+  summarise(total = sum(REL_PERCENT), .groups = "drop")
 
-  
-  
-  
-## old code ----
-# pick top 10 EVTs for each group
-EVT_top10 <- EVT_combined_df %>% 
-  slice_head(, n= 10, by = Group)
-
-unique(EVT_top10$EVT_NAME) # 19 unique EVTs
-
-# try 1
-EVT_combined_stackbar <- 
-  ggplot(EVT_top10, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME, order = REL_PERCENT)) +
-  geom_col(position = "stack") + 
-  labs(x = NULL, y = "Relative Percent", fill = "EVT_NAME") +
-  theme_minimal()
-# EVT bars not in order
-  
-# try 2
-EVT_combined_stackbar <- 
-  ggplot(EVT_top10, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME, order = REL_PERCENT)) +
-  geom_col(position = position_stack(reverse = TRUE)) + # adjusted 
-  labs(x = NULL, y = "Relative Percent", fill = "EVT_NAME") +
-  theme_minimal()
-# some are in order, but not all...
-
-# try 3
-# adjust the df - same top-bottom ordering for every group, based on global trends
-evt_order <- EVT_top10 %>% 
-  group_by(EVT_NAME) %>% 
-  summarise(total = sum(REL_PERCENT, na.rm = TRUE), .groups = "drop") %>% 
-  arrange(total) %>% 
-  pull(EVT_NAME)
-  
-EVT_top10_2 <- EVT_top10 %>% 
-  mutate(EVT_NAME = factor(EVT_NAME, levels = evt_order))
-str(EVT_top10_2)
-str(EVT_top10)
-
-EVT_combined_stackbar <- 
-  ggplot(EVT_top10_2, aes(x = Group, y = REL_PERCENT, fill = EVT_NAME)) +
-  geom_col(position = position_stack(reverse = TRUE), color = "white", linewidth = 0.3) +
-  scale_fill_viridis_d(option = "B", direction = 1) +
+# plot
+EVT_plot <- 
+  ggplot(evt_lumped, aes(x = Group, y = REL_PERCENT, 
+                         fill = EVT_name_lumped)) +
+  geom_col(position = position_stack(reverse = TRUE), color = "white", width = 0.9) + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_viridis_d(option = "H", direction = 1) +
   guides(fill = guide_legend(reverse = TRUE)) +
-  labs(x = NULL, y = "Percent", fill = "EVT") +
+  labs(x = NULL, y = "Relative Percent", fill = "EVT_NAME") +
   theme_minimal()
-  # has the largest overall (global) EVT category on top for each bar and for the legend order
-  # still not exactly what we want, but good enough for now... 
 
 
-## add elevation rank? ----
-# we want the evt legend to be ordered by elevation
-  # we will rank each EVT based on natural history data
+  
+
 
 
   
