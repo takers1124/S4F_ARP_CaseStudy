@@ -708,9 +708,9 @@ CaseStudy_PPUs <- c("223", "225", "232", "235", "239", "281", "282", "283", "286
 
 CP_PPUs_CaseStudy_vect <- CP_PPUs_vect %>% 
   filter(PPU_ID %in% CaseStudy_PPUs)
-  # 11 geoms
+  # 18 geoms
 
-sum(CP_PPUs_CaseStudy_vect$area_acres) # 1396.302 acres
+sum(CP_PPUs_CaseStudy_vect$area_acres) # 2272.514 acres
          
 ### write & read ----
 writeVector(CP_PPUs_CaseStudy_vect, "CP_PPUs_CaseStudy_vect.shp")
