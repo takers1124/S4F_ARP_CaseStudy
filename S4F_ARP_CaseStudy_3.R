@@ -405,8 +405,32 @@ write.csv(ARP_PCUs_CS_df, "ARP_PCUs_CS_df.csv", row.names = FALSE)
 
 ### (c) filter 2 ----
 
+#### curr, 1 match----
+# filter only PCUs that are within current climate-matched areas (have a match score >= 1 for curr)
+PCUs_matched_curr_vect <- ARP_PCUs_CS_vect %>%
+  filter(curr_sum >= 1)
+
+##### stats ----
+# has 1807 geoms
+(1807/6428)*100 # 28.11139 % of all the PCUs in the ARP are climate matched (under curr) with at least 1 PPU
+
+sum(PCUs_matched_curr_vect$area_acres) # 196223.6 acres
+# ARP is 1723619 acres
+(196223.6/1723619)*100 # 11.3844 % of area of ARP
+
+plot(PCUs_matched_curr_vect)
+polys(ARP_vect, col = "black", alpha=0.01, lwd=0.5)
+
+###### write & read ----
+writeVector(PCUs_matched_curr_vect, "PCUs_matched_curr_vect.shp")
+PCUs_matched_curr_vect <- vect("PCUs_matched_curr_vect.shp")
+
+PCUs_curr_df <- as.data.frame(PCUs_matched_curr_vect)
+
+
+
 #### ssp2, 1 match----
-# filter only PCUs that are within future-climate-matched areas (have a match score >= 1 for spp2)
+# filter only PCUs that are within future climate-matched areas (have a match score >= 1 for spp2)
 PCUs_matched_ssp2_vect <- ARP_PCUs_CS_vect %>%
   filter(ssp2_sum >= 1)
 
@@ -427,6 +451,10 @@ PCUs_matched_ssp2_vect <- vect("PCUs_matched_ssp2_vect.shp")
 
 PCUs_ssp2_df <- as.data.frame(PCUs_matched_ssp2_vect)
 
+
+
+
+
 ### (d) filter 3 ----
 # these is the objective-specific filter,
 # we are inventing the objectives for the case study
@@ -440,23 +468,33 @@ PCUs_ssp2_f3_sp <- PCUs_matched_ssp2_vect %>%
   filter(PIPO_tons >= 10)
   # has 641 geoms
 
-#### district ----
-PCUs_ssp2_f3_dist <- PCUs_ssp2_f3_sp %>% 
-  filter(DISTRICTNA == "Canyon Lakes Ranger District")
-  # has 430 geoms
+#### risk ----
+PCUs_ssp2_f3_cfp <- PCUs_ssp2_f3_sp %>% 
+  filter(CFP_prob >= 0.5)
+# has 299 geoms
 
-#### elevation ----
-PCUs_ssp2_f3_elv <- PCUs_ssp2_f3_dist %>% 
-  filter(Elv_med_ft >= 8000)
-  # has 67 geoms
+#### stats ----
+(299/6428)*100 # 4.651525 % of all the PCUs in the ARP meet filter 3 objectives
 
-(67/6428)*100 # 1.042315 % of all the PCUs in the ARP meet filter 3 objectives
-
-sum(PCUs_ssp2_f3_elv$area_acres) # 8092.143 acres
+sum(PCUs_ssp2_f3_cfp$area_acres) # 32088.97 acres
 # ARP is 1723619 acres
-(8092.143/1723619)*100 # 0.4694856 % of area of ARP
+(32088.97/1723619)*100 # 1.861721 % of area of ARP
 
-0.75/2
+
+
+
+#### district ----
+# PCUs_ssp2_f3_dist <- PCUs_ssp2_f3_sp %>% 
+#   filter(DISTRICTNA == "Canyon Lakes Ranger District")
+#   # has 430 geoms
+# 
+#### elevation ----
+# PCUs_ssp2_f3_elv <- PCUs_ssp2_f3_dist %>% 
+#   filter(Elv_med_ft >= 8000)
+#   # has 67 geoms
+
+
+
 
 
 ## (3) overlay Nursery ----
